@@ -1,0 +1,17 @@
+####################################
+# Project Dependency
+####################################
+- Express (web application framework for Node.js)
+
+
+#######################################
+# API Documentation
+#######################################
+https://docs.etherscan.io/v/holesky-etherscan/api-endpoints/contracts
+
+
+####################################
+# Project URL
+####################################
+http://localhost:5000/ethTxns/detect_fraud
+http://localhost:5000/ethContract/detect_vulnerability
