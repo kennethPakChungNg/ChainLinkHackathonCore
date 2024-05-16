@@ -30,8 +30,12 @@ other:
 # Useful Command
 ####################################
 git --version (for checking GIT installation)
+
 npm install
 npm run start
 
 nvm list
-
+nvm list available
+nvm use 20.12.2
+nvm install 20.12.2
+nvm uninstall 20.12.2
