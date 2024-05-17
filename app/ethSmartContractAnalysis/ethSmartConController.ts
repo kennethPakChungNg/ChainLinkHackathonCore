@@ -3,6 +3,29 @@ import {requestDirectQuestion as analysisByOpenAI} from "../../common/openAiUtil
 
 import {getPrompt_contractAna} from "../ethSmartContractAnalysis/apiCall/openAi/openAi_smartCon"
 import { ipfsUploadFile } from '../../common/ipfs/ipfsUtils';
+import { getContractSourceCodeByAddress } from "../../common/etherScanUtil"
+
+
+const getSmartContractSourceCodeByAddress = async(contractAddr: string) => {
+  logger.info( ` Retrieve source code for smart contract [addr=${contractAddr}] from Etherscan.` )
+
+  const responseBody = await getContractSourceCodeByAddress(contractAddr)
+
+  // console.log("###############################")
+  // console.log(responseBody[0].hasOwnProperty("SourceCode") )
+  // console.log(responseBody[0].SourceCode)
+  // console.log(responseBody[0]["SourceCode"])
+  // console.log(responseBody[0])
+  // console.log(responseBody)
+  // console.log("###############################")
+  // if (Object.keys(responseBody).length === 0 ){
+  //     return {}
+  // }
+  
+
+  return responseBody
+}
+
 
 const analyze_smart_contract = async( contractCode:string, solidityVersion:string ) =>{
     logger.info( " Generate prompt for vulnerability analysis of smart contract  . " )
@@ -66,4 +89,4 @@ const uploadContractResult = async( promptResult:any )=>{
 }
 
 
-export {analyze_smart_contract, uploadContractResult}
+export {analyze_smart_contract, uploadContractResult, getSmartContractSourceCodeByAddress}

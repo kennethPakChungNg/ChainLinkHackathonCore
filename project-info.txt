@@ -7,7 +7,14 @@
 #######################################
 # API Documentation
 #######################################
-https://docs.etherscan.io/v/holesky-etherscan/api-endpoints/contracts
+https://docs.etherscan.io/api-endpoints/contracts
+https://api.etherscan.io/api?module=contract&action=getsourcecode&apikey=V57BKSTZ6N9CF8GTZRZ61RGEK5PYKZR2X1&address=0x7718f81c0E52E4d46619D2b7Ee11D11260D3898C
+
+
+#######################################
+# Useful URL
+#######################################
+https://etherscan.io/contractsVerified
 
 
 ####################################
@@ -15,3 +22,5 @@ https://docs.etherscan.io/v/holesky-etherscan/api-endpoints/contracts
 ####################################
 http://localhost:5000/ethTxns/detect_fraud
 http://localhost:5000/ethContract/detect_vulnerability
+
+

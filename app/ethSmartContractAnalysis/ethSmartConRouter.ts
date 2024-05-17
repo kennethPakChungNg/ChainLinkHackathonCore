@@ -1,7 +1,29 @@
 import * as express from 'express'
 const router = express.Router();
 
-import {analyze_smart_contract, uploadContractResult } from "./ethSmartConController"
+import {analyze_smart_contract, uploadContractResult, getSmartContractSourceCodeByAddress } from "./ethSmartConController"
+
+
+router.post( '/getSmartContractSourceCodeByAddress', async(req: express.Request, res: express.Response)=>{   
+    try
+    {
+        const requestBody = req.body ;
+        const contractAddr: string = requestBody.contractAddr
+        const resultJson = await getSmartContractSourceCodeByAddress(contractAddr);
+  
+        console.log("###############################")
+        console.log(resultJson)
+        console.log("###############################")
+
+        res.json(resultJson);
+    }
+    catch(err)
+    {
+        console.error(err.message)
+        res.status(500)
+        res.send( { error: err })
+    }
+});
 
 
 // POST users listing. 
