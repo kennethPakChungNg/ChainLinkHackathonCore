@@ -1,0 +1,117 @@
+const {Wallet } = require( "@ethersproject/wallet")
+const {Contract} = require( "@ethersproject/contracts")
+const NewArchiveAPI = require("./apiCall/sample/sampleConsumer.json")
+const {JsonRpcProvider} = require( "@ethersproject/providers");
+
+const  {ContractIssuer, gWei2ETH} = require( "../../common/blockChainUtil")
+const { 
+    getDonSecretVersion, 
+    CL_SubscriptionManager,
+    CL_FunctionConsumer
+} =  require("../../common/chainlinkUtil")
+
+const logger = require("../../common/logger").logger
+
+const explorerUrl = 'https://amoy.polygonscan.com/tx'
+
+const sampleCall = async()=>{
+    const {POLY_PROVIDER_URL, POLY_CONTRACT_ADDRESS} = process.env
+    const providerUrl = POLY_PROVIDER_URL
+    const contractAddress = POLY_CONTRACT_ADDRESS
+
+    const provider = new JsonRpcProvider(providerUrl)
+
+
+
+    const newArchieveContract = new Contract(
+        contractAddress,
+        NewArchiveAPI,
+        provider
+    )
+
+    const result = await getAllArticles(newArchieveContract);
+    return result;
+}
+
+async function getAllArticles(newArchieveContract){
+    try{
+        const articles = await newArchieveContract.getAllArticles();
+
+        return articles;
+    }catch (error){
+        console.error("Error fetching articles:", error);
+        return [];
+    }
+}
+
+async function sampleCallWrite(){
+    const {ContractOwner_privateKey, POLY_CHAINLINK_SUBID, POLY_PROVIDER_URL, POLY_CONTRACT_ADDRESS} = process.env
+    const providerUrl = POLY_PROVIDER_URL
+    const contractAddress = POLY_CONTRACT_ADDRESS
+
+    const provider = new JsonRpcProvider(providerUrl)
+    const wallet = new Wallet(ContractOwner_privateKey);
+    const signer = wallet.connect( provider )
+    const newArchieveContract = new Contract(
+        contractAddress,
+        NewArchiveAPI,
+        signer
+    )
+
+    const transaction = await newArchieveContract.sendRequest(POLY_CHAINLINK_SUBID);
+
+    return transaction
+}
+
+async function getTxDetails(txnHash){
+    const { POLY_CHAINLINK_SUBID, POLY_CHAINLINK_DONID, POLY_PROVIDER_URL, POLY_TXN_CONTRACT_ADDRESS,POLY_CHAINLIN_FNC_ROUTER, POLY_CHAINLINK_TOKEN_ADDRESS} = process.env
+    const contractIssuer = new ContractIssuer(POLY_PROVIDER_URL);
+    const rpcProvider = contractIssuer.getRpcProvider();
+    const signer = contractIssuer.getSigner();
+
+    const consumerAbi = require("./apiCall/txDetails/polygonTransConsumer.json")
+
+    const api_secrets = {apiKey: process.env.POLY_SCAN_APIKEY }
+
+    const gasLimit = 300000;
+    
+    //upload secret to chainlink DON
+    let donHostedSecretsVersion = 0;
+    const slotId = 0;
+    if ( Object.keys(api_secrets).length != 0 ){
+        const expiration = 15 ;   //15mins
+        donHostedSecretsVersion = await getDonSecretVersion( signer, POLY_CHAINLIN_FNC_ROUTER, POLY_CHAINLINK_DONID, api_secrets, slotId, expiration );
+    }
+
+    //////// ESTIMATE REQUEST COSTS ////////
+    const cl_subManager = new CL_SubscriptionManager(signer, POLY_CHAINLIN_FNC_ROUTER, POLY_CHAINLINK_SUBID, POLY_CHAINLINK_TOKEN_ADDRESS, POLY_CHAINLINK_DONID );
+    await cl_subManager.init();
+
+    // estimate costs in Juels
+    await cl_subManager.estimateFunctionsRequestCost(gasLimit);
+
+    //send contract
+    const consumer = new CL_FunctionConsumer(signer, POLY_TXN_CONTRACT_ADDRESS, consumerAbi, explorerUrl );
+
+    const essentialFields = ['from', 'to', 'value', 'gas']
+    const transactionHash = await consumer.getFunctionsConsumer().sendRequest(
+        slotId,
+        donHostedSecretsVersion,
+        POLY_CHAINLINK_SUBID,
+        txnHash,
+        essentialFields
+    )
+    return { "hash": transactionHash };
+}
+
+const analyze_fraud = async(transaction_hash)=>{
+    try{
+        const txDetails = await getTxDetails(transaction_hash);
+
+        return txDetails;
+    }catch (error){
+        logger.error( error.message);
+        throw error;
+    }
+}
+module.exports =  { sampleCall, sampleCallWrite, analyze_fraud }

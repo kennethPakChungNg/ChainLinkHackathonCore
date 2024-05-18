@@ -1,5 +1,5 @@
 import logger from "./logger";
-
+import axios,{AxiosResponse } from 'axios';
 /**
  * 
  * @param bitQueryDtl from ethTxnsAnalysis/bitQuery/bitQuery.ts
@@ -13,4 +13,36 @@ const getContractType = ( bitQueryDtl:any, role: string ) =>{
     return contractType;
 }
 
-export { getContractType }
+const getBitQueryData = async( bitQuery:string, tx_hash: string ) =>{
+    logger.info(" Get trans details from bitquery. ")
+    const {BITQUERY_API_URL, BITQUERY_API_KEY} = process.env
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-API-KEY': BITQUERY_API_KEY
+    }
+    const requestBody = {
+        'query': bitQuery, 
+        'variables': {
+            "txHash": tx_hash
+        }
+    }
+
+    const response:AxiosResponse  = await axios.post( BITQUERY_API_URL,requestBody, {headers} );
+    let bitQueryDtl = {}
+    if ( response.status == 200 ){
+        if ( response.data['errors'] != undefined ){
+            logger.error( JSON.stringify(response.data['errors']) )
+            throw new Error( `Bitquery error.` )
+        }
+
+        //normal way
+        logger.info(" Successfully get trans details from bitquery. ")
+        const data = response.data['data']['ethereum']['transactions']
+        bitQueryDtl =  Array.isArray(data)? data[0]: {}
+    }else{
+        logger.error(`No data found for transaction hash: ${tx_hash}. Response: ${response.data}`)
+    }
+    return  bitQueryDtl
+}
+
+export { getContractType, getBitQueryData }

@@ -6,7 +6,7 @@ import logger from "./logger"
 
 class ContractIssuer {
     private privateKey: string = process.env.ContractOwner_privateKey;
-    private rpcUrl: string = process.env.ETHEREUM_SEPOLIA_RPC_URL;
+    private rpcUrl: string;
 
     private rpcProvider : JsonRpcProvider;
     private wallet : Wallet ;
@@ -50,5 +50,31 @@ const gWei2ETH = (gWei: BigNumberish )=>{
     return  formatEther(gWei)  
 }
 
+const getWalletAnalysis = ( addressDetail: any ) =>{
+    let time_diff_mins = null
+    let min_value_received = null
 
-export {ContractIssuer, gWei2ETH}
+    if ( addressDetail.length > 1 ){
+        const first_tx_time = Number( addressDetail[0]['timeStamp'] )
+        const last_tx_time = Number( addressDetail[addressDetail.length-1]['timeStamp'] )
+
+        time_diff_mins = (last_tx_time-first_tx_time)/60
+    }
+
+    if (addressDetail.length >  0 ){
+        min_value_received =  addressDetail.reduce((min, current) => {
+            const currentValue = parseFloat(current.value);
+            return currentValue < min ? currentValue : min;
+        }, Infinity);
+        
+        //from Wei to ETH
+        min_value_received = gWei2ETH(min_value_received)
+    }
+
+    return {
+        time_diff_mins:time_diff_mins,
+        min_value_received:min_value_received
+    }
+}
+
+export {ContractIssuer, gWei2ETH ,getWalletAnalysis}

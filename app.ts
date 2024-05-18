@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import ethTxnsAnalysisRouter from './app/ethTxnsAnalysis/txnsAnalysisRouter';
 import ethSmartConRouter from './app/ethSmartContractAnalysis/ethSmartConRouter';
 import avax_analysisRouter from './app/avaxAnalysis/avax_analysisRouter'
-
+import polygonAnalysisRouter from './app/polygonAnalysis/polygonAnalysisRouter'
 
 export default class Startup {
     app: any
@@ -14,20 +14,20 @@ export default class Startup {
         this.app = express();
     }
 
-    //Registers all middleware
+    // Registers all middleware
     public async setup(){
         require('dotenv').config()
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: false }));
         this.app.use(cookieParser());
 
-        //register controller routes
+        // register controller routes
         this.app.use('/ethTxns', ethTxnsAnalysisRouter);
         this.app.use('/ethContract', ethSmartConRouter);
 
-        //AVAX
+        // Avalanche (AVAX)
         this.app.use('/avax', avax_analysisRouter);
-        
+        this.app.use('/polygon', polygonAnalysisRouter);
         
         this.app.use(function(req, res, next) {
             next(createError(404));
@@ -43,8 +43,6 @@ export default class Startup {
             res.status(err.status || 500);
             res.render('error');
         });
-
-
     }
 
     //run the app on port
@@ -58,6 +56,5 @@ export default class Startup {
     public getWb3StorageClient(){
         return this.wb3StorageClient;
     }
-    
 }
   

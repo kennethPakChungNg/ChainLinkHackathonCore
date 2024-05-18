@@ -17,6 +17,7 @@ import {getPrompt_transFraud, rptPattern_transFraud} from "../ethTxnsAnalysis/ap
 import {requestDirectQuestion as analysisByOpenAI} from "../../common/openAiUtils"
 import { getTxnByHash } from "../../common/etherScanUtil"
 
+const explorerUrl = "https://sepolia.etherscan.io"
 
 /**
  * 
@@ -25,7 +26,7 @@ import { getTxnByHash } from "../../common/etherScanUtil"
  */
 const getTxDetails_CL = async(transaction_hash: string)=>{
     try{
-        const {ETH_SEPOLIA_routerAddress} = process.env;
+        const {ETH_SEPOLIA_routerAddress, ETH_subscriptionId, ETH_linkTokenAddress, ETH_donId, ETH_CONSUMER_CONTRACT_ADDRESS} = process.env
         //use chainlink to fetch data from etherscan
         const contractIssuer = new ContractIssuer(ETH_SEPOLIA_routerAddress);
         
@@ -41,11 +42,11 @@ const getTxDetails_CL = async(transaction_hash: string)=>{
         const txDetails_script = fs
         .readFileSync(path.resolve(__dirname, "./apiCall/txDetails/txDetails.js"))
         .toString();
-
+        const consumerAbi = require("../contract/ETH_FunctionsConsumer.json")
         const txDetails_secrets = {apiKey: process.env.ETHERSCAN_API_KEY }
 
         //////// ESTIMATE REQUEST COSTS ////////
-        const cl_subManager = new CL_SubscriptionManager(signer, ETH_SEPOLIA_routerAddress );
+        const cl_subManager = new CL_SubscriptionManager(signer, ETH_SEPOLIA_routerAddress, ETH_subscriptionId, ETH_linkTokenAddress, ETH_donId );
         await cl_subManager.init();
 
         // estimate costs in Juels
@@ -63,7 +64,7 @@ const getTxDetails_CL = async(transaction_hash: string)=>{
         const donHostedSecretsVersion = uploadResult.version; 
         
         //Define contract
-        const consumerContract = new CL_FunctionConsumer(signer);
+        const consumerContract = new CL_FunctionConsumer(signer, ETH_CONSUMER_CONTRACT_ADDRESS, consumerAbi, explorerUrl );
 
         //perform transaction to call etherscan api
         const txDetails_args =[transaction_hash]
@@ -128,7 +129,6 @@ const getBitQueryData = async( tx_hash: string ) =>{
         logger.info(" Successfully get trans details from bitquery. ")
         const data = response.data['data']['ethereum']['transactions']
         bitQueryDtl =  Array.isArray(data)? data[0]: {}
-         
     }else{
         logger.error(`No data found for transaction hash: {tx_hash}. Response: ${response.data}`)
     }
@@ -214,7 +214,7 @@ const getWalletAnalysis_ETH = async( walletAddr:string ) =>{
 
 const getWalletBalance_CL = async( walletAddr: string ) =>{
     try{
-        const {ETH_SEPOLIA_routerAddress} = process.env;
+        const {ETH_SEPOLIA_routerAddress, ETH_subscriptionId, ETH_linkTokenAddress, ETH_donId, ETH_CONSUMER_CONTRACT_ADDRESS } = process.env
 
         logger.info( `Getting balance of address ${walletAddr} through chainlink service` )
         //use chainlink to fetch data from etherscan
@@ -232,11 +232,13 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
         const txDetails_script = fs
         .readFileSync(path.resolve(__dirname, "./apiCall/addrBalance/addrBalance.js"))
         .toString();
+
+        const consumerAbi = require("../contract/ETH_FunctionsConsumer.json")
     
         const txDetails_secrets = {apiKey: process.env.ETHERSCAN_API_KEY }
     
         //////// ESTIMATE REQUEST COSTS ////////
-        const cl_subManager = new CL_SubscriptionManager(signer, ETH_SEPOLIA_routerAddress);
+        const cl_subManager = new CL_SubscriptionManager(signer, ETH_SEPOLIA_routerAddress, ETH_subscriptionId, ETH_linkTokenAddress, ETH_donId );
         await cl_subManager.init();
     
         // estimate costs in Juels
@@ -254,7 +256,7 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
         const donHostedSecretsVersion = uploadResult.version; 
         
         //Define contract
-        const consumerContract = new CL_FunctionConsumer(signer);
+        const consumerContract = new CL_FunctionConsumer(signer,ETH_CONSUMER_CONTRACT_ADDRESS, consumerAbi, explorerUrl);
     
         //perform transaction to call etherscan api
         const txDetails_args =[walletAddr]
@@ -288,7 +290,7 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
 
 const getWalletBalance_ETH = async( walletAddr: string, useChainlink: boolean ) =>{
     if ( useChainlink ){
-        return await getWalletBalance_CL
+        return await getWalletBalance_CL(walletAddr)
     }
     
     //directly call etherscan
@@ -314,7 +316,7 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
     if ( response.status == 200 ){
         const addressDetail = response.data['result']
 
-        const lastPageTrans = addressDetail.slice(0, 10 )
+        const lastPageTrans = addressDetail.slice(-10 );
 
         const walletAnaData = getWalletAnalysis_ETH( addressDetail )
         const walletBalance = await getWalletBalance_ETH( walletAddr, useChainlink )
@@ -330,12 +332,10 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
         }
 
         return values
-        
     }
 
     //default
     return {}
-
 }
 
 const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,bitQueryDtl:any, senderInfo:any, receiverInfo:any ) =>{
@@ -387,10 +387,9 @@ const analyze_fraud = async(transaction_hash: string)=>{
         const senderAddr = txDetails['from']
         const receiverAddr = txDetails['to']
 
-        //latest page trans, balance,last page transTime diff, min value received, format: {time_diff_mins:time_diff_mins, min_value_received:min_value_received}
-        const senderInfo = await getWalletDtls( senderAddr, false, "sender")    
-
         const useChainlinkService = false;
+        //latest page trans, balance,last page transTime diff, min value received, format: {time_diff_mins:time_diff_mins, min_value_received:min_value_received}
+        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")    
         const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
 
         //openai analysis
@@ -402,7 +401,6 @@ const analyze_fraud = async(transaction_hash: string)=>{
         logger.error( error.message);
         throw error;
     }
-
 }
 
 export { analyze_fraud }

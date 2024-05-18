@@ -1,0 +1,43 @@
+####################################
+# Useful Command
+####################################
+git --version (for checking GIT installation)
+
+npm install
+npm install --save-dev nodemon
+npm run start
+
+nvm list
+nvm list available
+nvm use 20.12.2
+nvm install 20.12.2
+nvm uninstall 20.12.2
+
+####################################
+# Preparation
+####################################
+git: 2.45.1
+node: 20.12.2
+npm: 10.5.0
+
+other:
+- visual studio IDE 2022 with C++ Desktop Development
+
+####################################
+# How to Setup
+####################################
+1. download project at https://github.com/kennethPakChungNg/ChainLinkHackathonCore
+2. npm install
+3. npm run start
+
+####################################
+# Fix npm install problem
+####################################
+- add an empty .npmignore file to project root folder
+- npm cache verify
+- npm cache clean --force
+- delete package-lock.json
+- delete /node_modules folder
+- create folder 'C:\Users\XXXXX\AppData\Roaming\npm
+
+

@@ -67,23 +67,28 @@ const handleSimulateResult = (response:any, returnType: ReturnType )=>{
 class CL_SubscriptionManager{
     private subscriptionManager: SubscriptionManager;
     private signer: Wallet;
-    private linkTokenAddress = process.env.linkTokenAddress;
+    private linkTokenAddress;
     private routerAddress ;
-    private subscriptionId: number = Number(process.env.subscriptionId);
-    private donId: string = process.env.donId ;
+    private subscriptionId: number ;
+    private donId: string ;
 
-    constructor( signer: Wallet, routerAddress: string ){
+    constructor( signer: Wallet, routerAddress: string,subscriptionId:string , linkTokenAddress:string, donId:string ){
+        logger.info("Define chainlink subscription manager.")
+
         if (!signer ){
             throw new Error("Must provide contract signer.");
         }
         this.signer = signer;
+        this.subscriptionId = Number(subscriptionId);
+        this.donId = donId;
+        this.linkTokenAddress = linkTokenAddress;
         this.routerAddress = routerAddress;
         this.subscriptionManager = new SubscriptionManager({
             signer: signer,
             linkTokenAddress: this.linkTokenAddress ,
             functionsRouterAddress: this.routerAddress,
         });
-        
+
     }
 
     public init = async()=>{
@@ -126,7 +131,7 @@ class CL_SubscriptionManager{
 class CL_secretsManager{
     private routerAddress ;
     private secretsManager: SecretsManager;
-    private donId: string = process.env.donId ;
+    private donId: string  ;
     private signer: Wallet ;
 
     //location of secret stored
@@ -134,9 +139,10 @@ class CL_secretsManager{
         "https://01.functions-gateway.testnet.chain.link/",
         "https://02.functions-gateway.testnet.chain.link/",
     ];
-    constructor( signer: Wallet, routerAddress:string ){
+    constructor( signer: Wallet, routerAddress:string, donId:string= process.env.donId ){
         this.signer = signer ;
         this.routerAddress = routerAddress;
+        this.donId = donId;
         this.secretsManager =  new SecretsManager({
             signer: signer,
             functionsRouterAddress: this.routerAddress,
@@ -145,6 +151,7 @@ class CL_secretsManager{
     }
 
     public init = async()=>{
+        logger.info( `Init secret manager of ${this.routerAddress}` )
         await this.secretsManager.initialize();
     }
 
@@ -181,11 +188,15 @@ class CL_secretsManager{
 
 class CL_FunctionConsumer{
     private functionsConsumer:Contract ;
-    private consumerAddress:string = process.env.CONSUMER_CONTRACT_ADDRESS;
-    private consumerAbi = require("../contract/FunctionsConsumer.json");
+    private consumerAddress:string ;
+    private consumerAbi ;
+    private explorerUrl;
 
-    constructor(signer:  Wallet){
+    constructor(signer:  Wallet, consumerAddress: string, consumerAbi, explorerUrl:string  ){
         logger.info( "Initialize Contract. " )
+        this.consumerAddress = consumerAddress;
+        this.consumerAbi = consumerAbi;
+        this.explorerUrl = explorerUrl;
         this.functionsConsumer = new Contract(
             this.consumerAddress,
             this.consumerAbi,
@@ -215,20 +226,28 @@ class CL_FunctionConsumer{
         chainlinkDonId:string
     ){
         logger.info("Make chalinlink function API call...")
-        const transaction = await this.functionsConsumer.sendRequest(
-            apiScript,encryptedSecretsUrls, 
-            secretSlotId,donHostedSecretsVersion,
-            apiRequestBody, byteArgs, 
-            chainlinkSubId, gasLimit,
-            formatBytes32String(chainlinkDonId)
-        );
 
-        // Log transaction details
-        logger.info( `\n✅ Functions request sent! Transaction hash ${transaction.hash}. Waiting for a response...` );
+        try{
+            const donIdByte32 =  formatBytes32String(chainlinkDonId)
+            const transaction = await this.functionsConsumer.sendRequest(
+                apiScript,encryptedSecretsUrls, 
+                secretSlotId,donHostedSecretsVersion,
+                apiRequestBody, byteArgs, 
+                chainlinkSubId, gasLimit,
+                donIdByte32
+            );
+    
+            // Log transaction details
+            logger.info( `\n✅ Functions request sent! Transaction hash ${transaction.hash}. Waiting for a response...` );
+    
+            logger.info( `See your request in the explorer ${explorerUrl}/tx/${transaction.hash}` );
+    
+            return transaction
+        }catch (error){
+            throw error;
+        }
 
-        logger.info( `See your request in the explorer ${explorerUrl}/tx/${transaction.hash}` );
-
-        return transaction
+ 
     }
 
     public async retrieveReponse( trans_hash:string, rpcProvider:JsonRpcProvider, routerAddress:string,decodeMethod: ReturnType){
@@ -236,7 +255,7 @@ class CL_FunctionConsumer{
             provider: rpcProvider,
             functionsRouterAddress: routerAddress,
         });
-
+        logger.info( `Listening for the response from ${trans_hash}` );
         const response = await responseListener.listenForResponseFromTransaction(trans_hash);
 
         logger.info( 'Recevied response' );
@@ -278,7 +297,27 @@ class CL_FunctionConsumer{
         //returnMsg += `Complete reponse: ${response}\n`
         logger.info(returnMsg)
     }
+
+    public getFunctionsConsumer(){
+        return this.functionsConsumer;
+    }
+
+    public getExplorerUrl(){
+        return this.explorerUrl;
+    }
+}
+
+async function getDonSecretVersion( signer: Wallet, functinRouter : string, donId: string, apiSecret: Record<string, string> , slotId: number, expiration: number ){
+    //secret manager
+    const cl_secretsManager =  new CL_secretsManager(signer, functinRouter, donId );
+    await cl_secretsManager.init();
+
+    const uploadResult = await cl_secretsManager.uploadSecretsToDON( apiSecret, slotId , expiration ); 
+
+    // fetch the reference of the encrypted secrets
+    const donHostedSecretsVersion = uploadResult.version; 
+    return donHostedSecretsVersion;
 }
 
 export { CL_SubscriptionManager, CL_secretsManager, 
-    CL_FunctionConsumer, chainlink_simulateScrpt , handleSimulateResult}
+    CL_FunctionConsumer, chainlink_simulateScrpt , handleSimulateResult, getDonSecretVersion}

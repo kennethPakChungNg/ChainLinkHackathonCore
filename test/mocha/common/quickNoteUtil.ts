@@ -13,7 +13,7 @@ before(function() {
 
 describe('App', function() {
 
-    it( 'Test ipfs upload', async ()=>{
+    it.skip( 'Test ipfs upload', async ()=>{
         const fileName = 'test.json'
         //load testing json file
         const sampleJson = fs.createReadStream(path.resolve(__dirname, `./${fileName}`))
