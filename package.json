@@ -9,6 +9,7 @@
     "startdev": "nodemon serviceStart.ts --ext \"ts,json,js\""
 
 
+
   },
   "author": "",
   "license": "ISC",
