@@ -10,9 +10,11 @@ router.post( '/detect_fraud' , async(req: express.Request,res: express.Response)
     {   
         //const , let , var
         const data = req.body ;
-        const transaction_hash: string = data.transaction_hash
+        const transaction_hash: string = data.hash
         const result = await analyze_fraud(transaction_hash);
-
+        if ( transaction_hash == undefined){
+            throw new Error("Please input transaction hash.")
+        }
         res.send(result);
     }catch(err)
     {

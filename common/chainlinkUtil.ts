@@ -308,14 +308,18 @@ class CL_FunctionConsumer{
 }
 
 async function getDonSecretVersion( signer: Wallet, functinRouter : string, donId: string, apiSecret: Record<string, string> , slotId: number, expiration: number ){
-    //secret manager
-    const cl_secretsManager =  new CL_secretsManager(signer, functinRouter, donId );
-    await cl_secretsManager.init();
+    let donHostedSecretsVersion = 0;
+    if (Object.keys(apiSecret).length != 0){
+        //secret manager
+        const cl_secretsManager =  new CL_secretsManager(signer, functinRouter, donId );
+        await cl_secretsManager.init();
 
-    const uploadResult = await cl_secretsManager.uploadSecretsToDON( apiSecret, slotId , expiration ); 
+        const uploadResult = await cl_secretsManager.uploadSecretsToDON( apiSecret, slotId , expiration ); 
 
-    // fetch the reference of the encrypted secrets
-    const donHostedSecretsVersion = uploadResult.version; 
+        // fetch the reference of the encrypted secrets
+        donHostedSecretsVersion = uploadResult.version; 
+    }
+
     return donHostedSecretsVersion;
 }
 

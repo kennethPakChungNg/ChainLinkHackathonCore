@@ -4,20 +4,27 @@ import logger from "../../common/logger"
 import {
     CL_SubscriptionManager, 
     CL_secretsManager, 
-    CL_FunctionConsumer
+    CL_FunctionConsumer,
+    getDonSecretVersion
 } from "../../common/chainlinkUtil"
 
 import {ContractIssuer, gWei2ETH} from "../../common/blockChainUtil"
-import {txRequestPortion} from "../ethTxnsAnalysis/apiCall/txDetails/txDetails_config"
+import {txRequestPortion} from "./apiCall/txDetails/txDetails_config"
 import axios,{AxiosResponse } from 'axios';
 
-import {query as bitQuery} from "../ethTxnsAnalysis/apiCall/bitQuery/bitQuery"
 import { ReturnType } from "@chainlink/functions-toolkit"
-import {getPrompt_transFraud, rptPattern_transFraud} from "../ethTxnsAnalysis/apiCall/openAi/openAi_transFraud"
-import {requestDirectQuestion as analysisByOpenAI} from "../../common/openAiUtils"
-import { getTxnByHash } from "../../common/etherScanUtil"
 
+import {
+    requestDirectQuestion as analysisByOpenAI,
+    rptPattern_transFraud,
+    getPrompt_transFraud
 
+} from "../../common/openAiUtils"
+import {query as bitQuerySql} from "./apiCall/bitQuery/bitQuery"
+import {getBitQueryData} from "../../common/bitQueryUtil"
+import { CL_FunctionConsumerAVAX } from "./avax_utils"
+
+const explorerUrl = "https://testnet.avascan.info/blockchain/c"
 /**
  * 
  * @param transaction_hash Using Chainlink function to get txDetails from etherscan API
@@ -25,10 +32,14 @@ import { getTxnByHash } from "../../common/etherScanUtil"
  */
 const getTxDetails_CL = async(transaction_hash: string)=>{
     try{
-        const {AVAX_CONSUMER_ADDRESS,AVAX_API_BASE_URL, AVAX_ROUTER_ADDRESS, 
-            AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_SUBID } = process.env;
-        //use chainlink to fetch data from etherscan
-        const contractIssuer = new ContractIssuer(AVAX_API_BASE_URL);
+        const {AVAX_CONSUMER_ADDRESS,AVAX_API_BASE_URL,  AVAX_CHAINLINK_FUNCTION_ROUTER,
+            AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_SUBID, AVAX_CHAINLINK_DONID, AVAX_RPC_URL,AVAX_RPC_APIKEY } = process.env;
+
+        //ABI to call contract
+        const consumerAbi = require("./apiCall/txDetails/AVA_FunctionsConsumer.json")
+
+        //to connect wallet of contract owner
+        const contractIssuer = new ContractIssuer(AVAX_RPC_URL);
         
         const rpcProvider = contractIssuer.getRpcProvider();
         const signer = contractIssuer.getSigner();
@@ -37,117 +48,89 @@ const getTxDetails_CL = async(transaction_hash: string)=>{
 
         //secret id on chainlink
         const slotId = 0 ;
+        
+        //trans credentials ( e.g. : Api Key)
+        const txDetails_secrets = {}
 
-        //trans details
-        const txDetails_script = fs
-        .readFileSync(path.resolve(__dirname, "./apiCall/txDetails/txDetails.js"))
-        .toString();
-
-        const txDetails_secrets = {apiKey: process.env.ETHERSCAN_API_KEY }
+        //Upload secret to chainlink
+        //let donHostedSecretsVersion = await getDonSecretVersion( signer, AVAX_CHAINLINK_FUNCTION_ROUTER, AVAX_CHAINLINK_DONID, txDetails_secrets, slotId, 15 );
 
         //////// ESTIMATE REQUEST COSTS ////////
-        const cl_subManager = new CL_SubscriptionManager(signer, AVAX_ROUTER_ADDRESS );
+        const cl_subManager = new CL_SubscriptionManager(signer, AVAX_CHAINLINK_FUNCTION_ROUTER , AVAX_CHAINLINK_SUBID, AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_DONID );
         await cl_subManager.init();
 
         // estimate costs in Juels
         await cl_subManager.estimateFunctionsRequestCost(gasLimit);
         
-        //////// MAKE REQUEST ////////
 
-        //secret manager
-        const cl_secretsManager =  new CL_secretsManager(signer, AVAX_ROUTER_ADDRESS );
-        await cl_secretsManager.init();
-
-        const uploadResult = await cl_secretsManager.uploadSecretsToDON( txDetails_secrets, slotId , 15 ); 
-
-        // fetch the reference of the encrypted secrets
-        const donHostedSecretsVersion = uploadResult.version; 
-        
+        //////// MAKE REQUEST ////////        
         //Define contract
-        const consumerContract = new CL_FunctionConsumer(signer);
+        const consumerContract = new CL_FunctionConsumerAVAX(signer, AVAX_CONSUMER_ADDRESS, consumerAbi,explorerUrl  );
 
         //perform transaction to call etherscan api
-        const txDetails_args =[transaction_hash]
+        const essentialFields = ['from', 'to', 'value', 'gas']
 
-        //Call txDetails partially
-        let reponse_txn = {}
-
-        for ( const [key, value] of  Object.entries(txRequestPortion)  ){
-            //perform transaction
-            const transaction = await consumerContract.sendRequest(
-                txDetails_script,
-                "0x",
-                slotId,
-                donHostedSecretsVersion,
-                txDetails_args.concat(value) ,
-                [],
-                gasLimit,
-                cl_subManager.getSubId(),
-                cl_subManager.getDonId()
-            );
-
-            const response = await consumerContract.retrieveReponse(transaction.hash, rpcProvider, cl_subManager.getRouterAddress(), ReturnType.string );
-            
-            if (response == '' ){
-                continue;
-            }
-            //to json
-            const jsonResponse = JSON.parse(response.toString())
-            reponse_txn = { ...reponse_txn , ...jsonResponse  }
-        };
+        //perform transaction
+        const functionCallTrans = await consumerContract.getFunctionsConsumer().sendRequest(
+            Number(AVAX_CHAINLINK_SUBID),
+            transaction_hash,
+            essentialFields 
+        );
         
-        return reponse_txn
+        const response = await consumerContract.retrieveReponse(functionCallTrans.hash, rpcProvider, cl_subManager.getRouterAddress(), ReturnType.string );
+        
+        //to json
+        const jsonResponse = JSON.parse(response.toString())
+
+        return jsonResponse
     }catch(err){
         throw err;
     }
 }
 
+/**
+ * Web2 approach to get trans detail
+ * @param transaction_hash 
+ * @returns 
+ */
+const getTxDetails = async( transaction_hash: string )=>{
+    const {AVAX_API_BASE_URL} = process.env
 
+    //directly call etherscan
+    logger.info(`Get tx details of txns ${transaction_hash}`)
 
-const getBitQueryData = async( tx_hash: string ) =>{
-    logger.info(" Get trans details from bitquery. ")
+    const url = `${AVAX_API_BASE_URL}`
+    /*
     const headers = {
         'Content-Type': 'application/json',
-        'X-API-KEY': process.env.BITQUERY_API_KEY
+        'Accept': 'application/json'
     }
+    */
+    const headers = {
+        'Content-Type': 'application/json'
+    }
+
     const requestBody = {
-        'query': bitQuery, 
-        'variables': {
-            "txHash": tx_hash
-        }
+        "jsonrpc": "2.0",
+        "id":1,
+        "method": "eth_getTransactionByHash",
+        "params": [
+            transaction_hash
+        ]
     }
 
-    const response:AxiosResponse  = await axios.post(process.env.BITQUERY_API_URL,requestBody, {headers} );
-    let bitQueryDtl = {}
-    if ( response.status == 200 ){
-        if ( response.data['errors'] != undefined ){
-            logger.error( JSON.stringify(response.data['errors']) )
-            throw new Error( `Bitquery error.` )
-        }
-
-        //normal way
-        logger.info(" Successfully get trans details from bitquery. ")
-        const data = response.data['data']['ethereum']['transactions']
-        bitQueryDtl =  Array.isArray(data)? data[0]: {}
-         
+    const response:AxiosResponse  = await axios.post( url,requestBody, {headers} );
+    logger.info(`Received trans details of  ${transaction_hash}`)
+    if ( response.data  != undefined && response.data != null ){
+        logger.info( "Get response." ) 
+        return response.data['result']
     }else{
-        logger.error(`No data found for transaction hash: {tx_hash}. Response: ${response.data}`)
-    }
-    return  bitQueryDtl
-}
-
-const getTxDetails_ETH = async (transaction_hash: string)=>{
-    logger.info(" Get trans details from etherscan. ")
-    
-    const tx_details= await getTxnByHash(transaction_hash)
-    if (Object.keys(tx_details).length === 0    ){
+        logger.error( "Cannot get response." )
         return {}
     }
-
-    return  tx_details 
 }
 
-const getWalletAnalysis_ETH = ( addressDetail: any ) =>{
+const getWalletAnalysis = ( addressDetail: any ) =>{
     let time_diff_mins = null
     let min_value_received = null
 
@@ -174,54 +157,16 @@ const getWalletAnalysis_ETH = ( addressDetail: any ) =>{
     }
 }
 
-
-/*
-############Deprecated##############Deprecated###########Deprecated############
-const getWalletAnalysis_ETH = async( walletAddr:string ) =>{
-    logger.info( `Retrieve time difference, min value received from addrss ${walletAddr} ` )
-
-    const apiKey = process.env.ETHERSCAN_API_KEY
-    const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${walletAddr}&startblock=0&endblock=99999999&sort=asc&apikey=${apiKey}`
-
-    const response = await axios.get(url);
-    let time_diff_mins = null
-    let min_value_received = null
-    if ( response.status == 200 ){
-        const txList=  response.data['result']
-
-
-        if ( txList.length > 1 ){
-            const first_tx_time = Number( txList[0]['timeStamp'] )
-            const last_tx_time = Number( txList[txList.length-1]['timeStamp'] )
-
-            time_diff_mins = (last_tx_time-first_tx_time)/60
-        }
-
-        if (txList.length >  0 ){
-            min_value_received =  txList.reduce((min, current) => {
-                const currentValue = parseFloat(current.value);
-                return currentValue < min ? currentValue : min;
-            }, Infinity);
-            
-            //from Wei to ETH
-            min_value_received = gWei2ETH(min_value_received)
-        }
-    }
-    //default
-    return { [walletAddr]:{time_diff_mins:time_diff_mins, min_value_received:min_value_received}}
-}
-############Deprecated##############Deprecated###########Deprecated############
-*/
-
 const getWalletBalance_CL = async( walletAddr: string ) =>{
     try{
-        const {AVAX_CONSUMER_ADDRESS,AVAX_API_BASE_URL, AVAX_ROUTER_ADDRESS, 
-            AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_SUBID } = process.env;
-
+        const {AVAX_CONSUMER_ADDRESS,AVAX_API_BASE_URL, AVAX_ROUTER_ADDRESS, AVAX_RPC_URL,
+            AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_SUBID, AVAX_CHAINLINK_DONID, AVAX_CHAINLINK_FUNCTION_ROUTER } = process.env;
+        
+        const consumerAbi = require("../avaxAnalysis/apiCall/txDetails/AVA_FunctionsConsumer.json")
 
         logger.info( `Getting balance of address ${walletAddr} through chainlink service` )
         //use chainlink to fetch data from etherscan
-        const contractIssuer = new ContractIssuer(AVAX_ROUTER_ADDRESS);
+        const contractIssuer = new ContractIssuer(AVAX_RPC_URL);
     
         const rpcProvider = contractIssuer.getRpcProvider();
         const signer = contractIssuer.getSigner();
@@ -233,34 +178,36 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
     
         //trans details
         const txDetails_script = fs
-        .readFileSync(path.resolve(__dirname, "./apiCall/addrBalance/addrBalance.js"))
+        .readFileSync(path.resolve(__dirname, "./apiCall/txDetails/addrBalance.js"))
         .toString();
     
-        const txDetails_secrets = {apiKey: process.env.ETHERSCAN_API_KEY }
-    
+        const txDetails_secrets = {  }
+            
+        let donHostedSecretsVersion = 0 ;
+        if ( Object.keys( txDetails_secrets ).length != 0 ){
+            //secret manager
+            const cl_secretsManager =  new CL_secretsManager(signer, AVAX_CHAINLINK_FUNCTION_ROUTER);
+            await cl_secretsManager.init();
+        
+            const uploadResult = await cl_secretsManager.uploadSecretsToDON( txDetails_secrets, slotId , 15 ); 
+        
+            // fetch the reference of the encrypted secrets
+            donHostedSecretsVersion = uploadResult.version; 
+        }
+
         //////// ESTIMATE REQUEST COSTS ////////
-        const cl_subManager = new CL_SubscriptionManager(signer, AVAX_ROUTER_ADDRESS);
+        const cl_subManager = new CL_SubscriptionManager(signer, AVAX_CHAINLINK_FUNCTION_ROUTER,AVAX_CHAINLINK_SUBID, AVAX_LINK_TOKEN_ADDRESS, AVAX_CHAINLINK_DONID);
         await cl_subManager.init();
     
         // estimate costs in Juels
         await cl_subManager.estimateFunctionsRequestCost(gasLimit);
         
         //////// MAKE REQUEST ////////
-    
-        //secret manager
-        const cl_secretsManager =  new CL_secretsManager(signer, AVAX_ROUTER_ADDRESS);
-        await cl_secretsManager.init();
-    
-        const uploadResult = await cl_secretsManager.uploadSecretsToDON( txDetails_secrets, slotId , 15 ); 
-    
-        // fetch the reference of the encrypted secrets
-        const donHostedSecretsVersion = uploadResult.version; 
-        
         //Define contract
-        const consumerContract = new CL_FunctionConsumer(signer);
+        const consumerContract = new CL_FunctionConsumer(signer, AVAX_CONSUMER_ADDRESS, consumerAbi,  explorerUrl );
     
         //perform transaction to call etherscan api
-        const txDetails_args =[walletAddr]
+        const txDetails_args =[ AVAX_API_BASE_URL, walletAddr]
     
         const transaction = await consumerContract.sendRequest(
             txDetails_script,
@@ -289,17 +236,32 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
 
 
 
-const getWalletBalance_ETH = async( walletAddr: string, useChainlink: boolean ) =>{
+const getWalletBalance = async( walletAddr: string, useChainlink: boolean ) =>{
     if ( useChainlink ){
-        return await getWalletBalance_CL
+        logger.info(`Get balance of address ${walletAddr} using Chainlink function. `)
+        return await getWalletBalance_CL(walletAddr)
     }
-    
+    const { AVAX_RPC_URL } = process.env
+
+    const url = `${AVAX_RPC_URL}`
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    const requestBody = {
+        "jsonrpc": "2.0",
+        "id":1,
+        "method": "eth_getAssetBalance",
+        "params": [
+            walletAddr,
+            "latest"
+        ]
+    }
+
+
     //directly call etherscan
     logger.info(`Get balance of address ${walletAddr}`)
-    const apiKey = process.env.ETHERSCAN_API_KEY
-    const url = `https://api.etherscan.io/api?module=account&action=balance&address=${walletAddr}&tag=latest&apikey=${apiKey}`
-
-    const response = await axios.get(url);
+    const response = await axios.post(url, requestBody, {headers});
     let balance = null;
     if ( response.status == 200 ){
         balance = gWei2ETH(response.data['result'])  
@@ -310,17 +272,29 @@ const getWalletBalance_ETH = async( walletAddr: string, useChainlink: boolean ) 
 }
 
 const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: string ) =>{
-    const apiKey = process.env.ETHERSCAN_API_KEY
-    const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${walletAddr}&startblock=0&endblock=99999999&sort=asc&apikey=${apiKey}`
+    const { AVAX_RPC_URL } = process.env
 
-    const response = await axios.get(url);
+    const url = `${AVAX_RPC_URL}`
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    const requestBody = {
+        "jsonrpc": "2.0",
+        "method": "eth_getTransactionByHash",
+        "params": [
+            walletAddr
+        ]
+    }
+
+    const response = await axios.post(url, requestBody, {headers});
     if ( response.status == 200 ){
         const addressDetail = response.data['result']
 
-        const lastPageTrans = addressDetail.slice(0, 10 )
+        const lastPageTrans = addressDetail.slice(-10 )
 
-        const walletAnaData = getWalletAnalysis_ETH( addressDetail )
-        const walletBalance = await getWalletBalance_ETH( walletAddr, useChainlink )
+        const walletAnaData = getWalletAnalysis( addressDetail )
+        const walletBalance = await getWalletBalance( walletAddr, useChainlink )
 
         const values = { 
             ...{
@@ -353,7 +327,7 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
     )
 
     const requestBody = {
-        'model': 'gpt-4-0125-preview',
+        'model': 'gpt-4o',
         'messages': [
             {"role": "system", "content": prompt_transFraud},
             {"role": "user", "content": "Analyze the transaction"}
@@ -361,7 +335,6 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
         'max_tokens': 600,
         'temperature': 0.5
     }
-
 
     //logger.info(`Prompt: ${prompt_transFraud} `)
 
@@ -383,18 +356,17 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
 const analyze_fraud = async(transaction_hash: string)=>{
     try{
         //Return format:   tx_details 
-        const txDetails = await getTxDetails_CL(transaction_hash);
+        const bitQueryDtl = await getBitQueryData( bitQuerySql, transaction_hash )
 
-        const bitQueryDtl =  await getBitQueryData( transaction_hash )
+        const txDetails = await getTxDetails_CL(transaction_hash);
         
         const senderAddr = txDetails['from']
         const receiverAddr = txDetails['to']
 
-        //latest page trans, balance,last page transTime diff, min value received, format: {time_diff_mins:time_diff_mins, min_value_received:min_value_received}
-        const senderInfo = await getWalletDtls( senderAddr, false, "sender")    
-
         const useChainlinkService = false;
+        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")    
         const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
+
 
         //openai analysis
         const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
@@ -408,4 +380,4 @@ const analyze_fraud = async(transaction_hash: string)=>{
 
 }
 
-export { analyze_fraud }
+export { analyze_fraud, getWalletDtls }
