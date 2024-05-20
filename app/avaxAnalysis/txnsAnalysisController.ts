@@ -11,8 +11,11 @@ import {
 import {ContractIssuer, gWei2ETH} from "../../common/blockChainUtil"
 import {txRequestPortion} from "./apiCall/txDetails/txDetails_config"
 import axios,{AxiosResponse } from 'axios';
-
-import { ReturnType } from "@chainlink/functions-toolkit"
+import {requestTxnListAvaCloud} from "./avax_utils"
+import { 
+    ReturnType,
+    decodeResult
+} from "@chainlink/functions-toolkit"
 
 import {
     requestDirectQuestion as analysisByOpenAI,
@@ -135,15 +138,15 @@ const getWalletAnalysis = ( addressDetail: any ) =>{
     let min_value_received = null
 
     if ( addressDetail.length > 1 ){
-        const first_tx_time = Number( addressDetail[0]['timeStamp'] )
-        const last_tx_time = Number( addressDetail[addressDetail.length-1]['timeStamp'] )
+        const first_tx_time = Number( addressDetail[0]['nativeTransaction']['blockTimestamp'] )
+        const last_tx_time = Number( addressDetail[addressDetail.length-1]['nativeTransaction']['blockTimestamp'] )
 
         time_diff_mins = (last_tx_time-first_tx_time)/60
     }
 
     if (addressDetail.length >  0 ){
         min_value_received =  addressDetail.reduce((min, current) => {
-            const currentValue = parseFloat(current.value);
+            const currentValue = parseFloat(current['nativeTransaction']['value']);
             return currentValue < min ? currentValue : min;
         }, Infinity);
         
@@ -251,7 +254,7 @@ const getWalletBalance = async( walletAddr: string, useChainlink: boolean ) =>{
     const requestBody = {
         "jsonrpc": "2.0",
         "id":1,
-        "method": "eth_getAssetBalance",
+        "method": "eth_getBalance",
         "params": [
             walletAddr,
             "latest"
@@ -264,7 +267,8 @@ const getWalletBalance = async( walletAddr: string, useChainlink: boolean ) =>{
     const response = await axios.post(url, requestBody, {headers});
     let balance = null;
     if ( response.status == 200 ){
-        balance = gWei2ETH(response.data['result'])  
+        const decodedBalance= decodeResult(response.data['result'], ReturnType.uint256)
+        balance = gWei2ETH( decodedBalance ) 
     }
 
     logger.info(`Received balance of address ${walletAddr}`)
@@ -272,24 +276,9 @@ const getWalletBalance = async( walletAddr: string, useChainlink: boolean ) =>{
 }
 
 const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: string ) =>{
-    const { AVAX_RPC_URL } = process.env
 
-    const url = `${AVAX_RPC_URL}`
-    const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
-    const requestBody = {
-        "jsonrpc": "2.0",
-        "method": "eth_getTransactionByHash",
-        "params": [
-            walletAddr
-        ]
-    }
-
-    const response = await axios.post(url, requestBody, {headers});
-    if ( response.status == 200 ){
-        const addressDetail = response.data['result']
+    const addressDetail = await requestTxnListAvaCloud(walletAddr);
+    if ( Object.keys(addressDetail).length != 0 ){
 
         const lastPageTrans = addressDetail.slice(-10 )
 
@@ -298,10 +287,10 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
 
         const values = { 
             ...{
-                walletAddr: walletAddr,
-                walletAnaData:walletAnaData, 
-                lastPageTrans: lastPageTrans,
-                role: role
+                "walletAddr": walletAddr,
+                "walletAnaData":walletAnaData, 
+                "lastPageTrans": lastPageTrans,
+                "role": role
             } , 
             ...walletBalance   
         }
@@ -323,7 +312,9 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
         txDetails,
         bitQueryDtl,
         senderInfo,
-        receiverInfo
+        receiverInfo,
+        "AVAX",
+        "Avalanche"
     )
 
     const requestBody = {

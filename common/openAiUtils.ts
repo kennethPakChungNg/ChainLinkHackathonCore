@@ -2,6 +2,10 @@ import logger from './logger';
 
 import axios,{AxiosResponse } from 'axios';
 import {gWei2ETH} from "./blockChainUtil"
+import {
+    ReturnType,
+    decodeResult
+}  from "@chainlink/functions-toolkit" ;
 import {getContractType} from "./bitQueryUtil"
 
 const OPENAI_API_BASE_URL = 'https://api.openai.com'
@@ -43,46 +47,46 @@ const rptPattern_transFraud = {
     Recommended_Actions: /\*\*Recommended Actions\*\*:\s*(.+)/
 }
 
-const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQueryDtl:any, senderInfo: any, receiverInfo: any ) => {
+const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQueryDtl:any, senderInfo: any, receiverInfo: any, currency: string , chainName: string ) => {
     const senderAddr = senderInfo['walletAddr']
     const receiver = receiverInfo['walletAddr']
 
     const senderTimeDiff = decideDataForPrompt(senderInfo.walletAnaData.time_diff_mins)
     const senderBalance = decideDataForPrompt(senderInfo.balance)
-    const senderMinValueReceived = decideDataForPrompt(senderInfo.min_value_received)
+    const senderMinValueReceived = decideDataForPrompt(senderInfo.walletAnaData.min_value_received)
     const senderContractType = decideDataForPrompt( getContractType(bitQueryDtl, senderInfo['role'] ) )
 
     const receiverTimeDiff = decideDataForPrompt(receiverInfo.walletAnaData.time_diff_mins)
     const receiverBalance = decideDataForPrompt(receiverInfo.balance)
-    const receiverMinValueReceived = decideDataForPrompt(receiverInfo.min_value_received)
+    const receiverMinValueReceived = decideDataForPrompt(receiverInfo.walletAnaData.min_value_received)
     const receiverContractType = decideDataForPrompt( getContractType(bitQueryDtl, receiverInfo['role'] ) )
 
     const prompt = `
-    Assume you are an blockchain security expert in cryptocurrency fraud transaction detection and crypto scam phishing with access to multiple data sources including Etherscan, 
-    blockchain analytics tools, and real-time market data. You are analyzing the Ethereum transaction with hash 
+    Assume you are an blockchain security expert in cryptocurrency fraud transaction detection and crypto scam phishing with access to multiple data sources including ${chainName}, 
+    blockchain analytics tools, and real-time market data. You are analyzing the ${chainName} transaction with hash 
     ${transaction_hash}.
 
-    Based on the information and real-time data from Etherscan which listed to you below:
+    Based on the information and real-time data from ${chainName} which listed to you below:
 
     Transaction Hash: ${transaction_hash}
     From address: ${senderAddr} (Previous transactions: ${senderInfo.lastPageTrans.length})
     To address: ${receiver} (Previous transactions: ${receiverInfo.lastPageTrans.length})
-    Transaction Value: ${  gWei2ETH(parseInt(txDetails['value'], 16 ) ) } ETH
-    Gas Used: ${ parseInt(txDetails['gas'], 16)}
+    Transaction Value: ${  gWei2ETH(decodeResult( txDetails['value'],ReturnType.int256  ) ) } ${currency}
+    Gas Used: ${ decodeResult(txDetails['gas'], ReturnType.int256 )}
 
     Time difference between the first and last transactions for the From address: ${senderTimeDiff} minutes
-    Total Ether balance for the From address: ${senderBalance} ETH
-    Minimum value received for the From address: ${senderMinValueReceived} ETH
+    Total ${currency} balance for the From address: ${senderBalance} ${currency}
+    Minimum value received for the From address: ${senderMinValueReceived} ${currency}
 
     Time difference between the first and last transactions for the To address: ${receiverTimeDiff} minutes
-    Total Ether balance for the To address: ${receiverBalance} ETH
-    Minimum value received for the To address: ${receiverMinValueReceived} ETH
+    Total ${currency} balance for the To address: ${receiverBalance} ${currency}
+    Minimum value received for the To address: ${receiverMinValueReceived} ${currency}
 
     Bitquery has provided the following additional data:
     From Address Contract Type: ${senderContractType}
     To Address Contract Type: ${receiverContractType}
 
-    With the data provided, assess the potential fraud risk of this Ethereum transaction or the from address fall in to phishing scam.
+    With the data provided, assess the potential fraud risk of this ${chainName} transaction or the from address fall in to phishing scam.
 
     The analysis should be structured strictly as follows, with each section's title in bold and followed by the analysis content:
 

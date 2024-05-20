@@ -16,12 +16,12 @@ const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQuer
 
     const senderTimeDiff = decideDataForPrompt(senderInfo.walletAnaData.time_diff_mins)
     const senderBalance = decideDataForPrompt(senderInfo.balance)
-    const senderMinValueReceived = decideDataForPrompt(senderInfo.min_value_received)
+    const senderMinValueReceived = decideDataForPrompt(senderInfo.walletAnaData.min_value_received)
     const senderContractType = decideDataForPrompt( getContractType(bitQueryDtl, senderInfo['role'] ) )
 
     const receiverTimeDiff = decideDataForPrompt(receiverInfo.walletAnaData.time_diff_mins)
     const receiverBalance = decideDataForPrompt(receiverInfo.balance)
-    const receiverMinValueReceived = decideDataForPrompt(receiverInfo.min_value_received)
+    const receiverMinValueReceived = decideDataForPrompt(receiverInfo.walletAnaData.min_value_received)
     const receiverContractType = decideDataForPrompt( getContractType(bitQueryDtl, receiverInfo['role'] ) )
 
     const prompt = `

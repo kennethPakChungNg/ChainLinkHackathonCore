@@ -14,8 +14,8 @@ before(function() {
 });
 
 describe('Polygon App', async function() {
-
-    it( 'Test getting walletDtls', async (done)=>{
+    this.timeout(5000);
+    it( 'Test getting walletDtls', async ()=>{
         const address = "0x0f3284bFEbc5f55B849c8CF792D39cC0f729e0BC"
         const receiverInfo = await getWalletDtls( address, false, "to")    
 
@@ -25,6 +25,5 @@ describe('Polygon App', async function() {
         notStrictEqual(receiverInfo['lastPageTrans'], null, 'Value should not be null');
         notStrictEqual(receiverInfo['min_value_received'], null, 'Value should not be null');
         notStrictEqual(receiverInfo['walletAnaData'].time_diff_mins, null, 'Value should not be null');
-        done();
     })
 })

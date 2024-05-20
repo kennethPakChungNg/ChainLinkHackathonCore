@@ -110,10 +110,10 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
 
         const values = { 
             ...{
-                walletAddr: walletAddr,
-                walletAnaData:walletAnaData, 
-                lastPageTrans: lastPageTrans,
-                role: role
+                "walletAddr": walletAddr,
+                "walletAnaData":walletAnaData, 
+                "lastPageTrans": lastPageTrans,
+                "role": role
             } , 
             ...walletBalance   
         }
@@ -178,7 +178,9 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
         txDetails,
         bitQueryDtl,
         senderInfo,
-        receiverInfo
+        receiverInfo,
+        "MATIC",
+        "Polygon"
     )
 
     const requestBody = {

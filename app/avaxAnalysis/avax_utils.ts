@@ -9,6 +9,7 @@ import {
     ReturnType,
     decodeResult
 } from "@chainlink/functions-toolkit" ;
+import axios from "axios"
 
 class CL_FunctionConsumerAVAX extends CL_FunctionConsumer{
     public async sendAxaxTxnRequest(
@@ -76,4 +77,30 @@ const getSigner = async (wallet:Wallet , rpcProvider: JsonRpcProvider)=>{
     return wallet.connect( rpcProvider);
 }
 
-export {CL_FunctionConsumerAVAX, getRpcProvider, getWallet, getSigner}
+
+const requestTxnListAvaCloud = async( address: string )=>{
+    const {AVACLOUD_APIKEY, AVACLOUD_CHAINID, AVACLOUD_BASEURL } = process.env
+
+    const headers = {
+        'x-glacier-api-key': AVACLOUD_APIKEY,
+        "Content-Type": "Application/json"
+    }
+
+    const requestUrl = `${AVACLOUD_BASEURL}/${AVACLOUD_CHAINID}/addresses/${address}/transactions?pageSize=100&sortOrder=asc` ;
+
+    logger.info( "Start retriving txns list of wallet.")
+    const response = await axios.get( requestUrl, {headers} )
+
+    //check status
+    let returnData = {}
+    if( response.status == 200 ){
+        return response.data.transactions
+    }else{
+        logger.error("Cannot retrieve trans list of address from avacloud.")
+    }
+
+    logger.info( "Finished retriving txns list of wallet.")
+    return returnData
+}
+
+export {CL_FunctionConsumerAVAX, getRpcProvider, getWallet, getSigner, requestTxnListAvaCloud}
