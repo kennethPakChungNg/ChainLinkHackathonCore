@@ -377,8 +377,8 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
     return resultReport
 }
 
-const analyze_fraud = async(transaction_hash: string)=>{
-    try{
+const analyze_fraud = async(transaction_hash: string) => {
+    try {
         //Return format:   tx_details 
         const txDetails = await getTxDetails_ETH(transaction_hash);
         //const txDetails = await getTxDetails_CL(transaction_hash);
@@ -392,18 +392,14 @@ const analyze_fraud = async(transaction_hash: string)=>{
         const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")    
         const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
 
-        //openai analysis
-        // const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
-        // return analysisResult;
-
-        return txDetails;
-
-    }catch (error){
+        // openai analysis
+        const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
+        return analysisResult;
+    }
+    catch (error) {
         logger.error( error.message);
         throw error;
     }
 }
-
-
 
 export { analyze_fraud }
