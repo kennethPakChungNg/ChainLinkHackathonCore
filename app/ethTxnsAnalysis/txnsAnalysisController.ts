@@ -139,7 +139,7 @@ const getTxDetails_ETH = async (transaction_hash: string)=>{
     logger.info(" Get trans details from etherscan. ")
     
     const tx_details= await getTxnByHash(transaction_hash)
-    if (Object.keys(tx_details).length === 0    ){
+    if (Object.keys(tx_details).length === 0){
         return {}
     }
 
@@ -393,9 +393,10 @@ const analyze_fraud = async(transaction_hash: string)=>{
         const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
 
         //openai analysis
-        const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
+        // const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
+        // return analysisResult;
 
-        return analysisResult;
+        return txDetails;
 
     }catch (error){
         logger.error( error.message);
