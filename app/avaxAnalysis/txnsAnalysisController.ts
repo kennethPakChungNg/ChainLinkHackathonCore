@@ -27,6 +27,8 @@ import {query as bitQuerySql} from "./apiCall/bitQuery/bitQuery"
 import {getBitQueryData} from "../../common/bitQueryUtil"
 import { CL_FunctionConsumerAVAX } from "./avax_utils"
 
+import {CountdownLatch} from '../../common/threadControl'
+
 const explorerUrl = "https://testnet.avascan.info/blockchain/c"
 /**
  * 
@@ -371,4 +373,49 @@ const analyze_fraud = async(transaction_hash: string)=>{
 
 }
 
-export { analyze_fraud, getWalletDtls }
+const getBitQueryDataCD = async(bitQuerySql, transaction_hash, countDownLatch:CountdownLatch ) =>{
+
+    const data =  await getBitQueryData(bitQuerySql, transaction_hash )
+    countDownLatch.countDown(data, 'bitQuery');
+}
+
+const getWalletDtlsCD = async( walletAddr, useChainlinkService, role, countDownLatch:CountdownLatch)=>{
+    const data = await getWalletDtls( walletAddr, useChainlinkService, role);
+
+
+    countDownLatch.countDown(data, role);
+}    
+
+const getTxnsCD = async( transaction_hash:string, countDownLatch: CountdownLatch, functionName )=>{
+    const data = await getTxDetails_CL(transaction_hash);
+    countDownLatch.countDown(data, functionName);
+}
+
+const analyzeFraudPerm = async(transaction_hash: string)=>{
+    const totalJobs = 3;
+    const latch = new CountdownLatch(totalJobs);
+
+    const bitQueryDtl = await getBitQueryData( bitQuerySql, transaction_hash )
+    const senderAddr =  bitQueryDtl['sender']['address']
+    const receiverAddr = bitQueryDtl['to']['address']
+
+    const useChainlinkService = false;
+    getWalletDtlsCD( senderAddr, useChainlinkService, "sender", latch)    
+    getWalletDtlsCD( receiverAddr, useChainlinkService, "to", latch)    
+    getTxnsCD(transaction_hash, latch, 'txDetails'  );
+    logger.info("waiting for results from mutiple data source.")
+    await latch.wait();
+
+    logger.info("Collected all data.")
+    const countDownResults = latch.getResults();
+
+    const txDetails= countDownResults['txDetails'];
+    const senderInfo = countDownResults['sender']
+    const receiverInfo = countDownResults['to']
+
+    const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
+
+    return analysisResult;
+}
+
+export { analyze_fraud, getWalletDtls, analyzeFraudPerm }
