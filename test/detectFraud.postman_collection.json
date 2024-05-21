@@ -1,0 +1,715 @@
+{
+	"info": {
+		"_postman_id": "811814db-ddb9-4acc-be37-c04938e9b533",
+		"name": "ether scan",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "http://localhost:5000/detect_vulnerability",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"code\": \"interface IERC20 {\\r\\n    function balanceOf(address who) external view returns (uint256);\\r\\n    function transfer(address to, uint256 value) external returns (bool);\\r\\n}\\r\\n\\r\\ncontract LotteryTicket {\\r\\n    address owner;\\r\\n    string public constant name = \\\"LotteryTicket\\\";\\r\\n    string public constant symbol = \\\"\\u2713\\\";\\r\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\r\\n    constructor() public {\\r\\n        owner = msg.sender;\\r\\n    }\\r\\n    function emitEvent(address addr) public {\\r\\n        require(msg.sender == owner);\\r\\n        emit Transfer(msg.sender, addr, 1);\\r\\n    }\\r\\n}\\r\\n\\r\\ncontract WinnerTicket {\\r\\n    address owner;\\r\\n    string public constant name = \\\"WinnerTicket\\\";\\r\\n    string public constant symbol = \\\"\\u2713\\\";\\r\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\r\\n    constructor() public {\\r\\n        owner = msg.sender;\\r\\n    }\\r\\n    function emitEvent(address addr) public {\\r\\n        require(msg.sender == owner);\\r\\n        emit Transfer(msg.sender, addr, 1);\\r\\n    }\\r\\n}\\r\\n\\r\\ncontract Ownable {\\r\\n    address public owner;\\r\\n    event OwnershipRenounced(address indexed previousOwner);\\r\\n    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);\\r\\n    constructor() public {\\r\\n        owner = msg.sender;\\r\\n    }\\r\\n    modifier onlyOwner() {\\r\\n        require(msg.sender == owner);\\r\\n        _;\\r\\n    }\\r\\n    function renounceOwnership() public onlyOwner {\\r\\n        emit OwnershipRenounced(owner);\\r\\n        owner = address(0);\\r\\n    }\\r\\n    function transferOwnership(address newOwner) public onlyOwner {\\r\\n        require(newOwner != address(0));\\r\\n        emit OwnershipTransferred(owner, newOwner);\\r\\n        owner = newOwner;\\r\\n    }\\r\\n}\\r\\n\\r\\ncontract Storage {\\r\\n    address owner;\\r\\n\\r\\n    mapping (address => uint256) public amount;\\r\\n    mapping (uint256 => address[]) public level;\\r\\n    uint256 public count;\\r\\n    uint256 public maximum;\\r\\n\\r\\n    constructor() public {\\r\\n        owner = msg.sender;\\r\\n    }\\r\\n\\r\\n    function purchase(address addr) public {\\r\\n        require(msg.sender == owner);\\r\\n\\r\\n        amount[addr]++;\\r\\n        if (amount[addr] > 1) {\\r\\n            level[amount[addr]].push(addr);\\r\\n            if (amount[addr] > 2) {\\r\\n                for (uint256 i = 0; i < level[amount[addr] - 1].length; i++) {\\r\\n                    if (level[amount[addr] - 1][i] == addr) {\\r\\n                        delete level[amount[addr] - 1][i];\\r\\n                        break;\\r\\n                    }\\r\\n                }\\r\\n            } else if (amount[addr] == 2) {\\r\\n                count++;\\r\\n            }\\r\\n            if (amount[addr] > maximum) {\\r\\n                maximum = amount[addr];\\r\\n            }\\r\\n        }\\r\\n\\r\\n    }\\r\\n\\r\\n    function draw(uint256 goldenWinners) public view returns(address[] addresses) {\\r\\n\\r\\n        addresses = new address[](goldenWinners);\\r\\n        uint256 winnersCount;\\r\\n\\r\\n        for (uint256 i = maximum; i >= 2; i--) {\\r\\n            for (uint256 j = 0; j < level[i].length; j++) {\\r\\n                if (level[i][j] != address(0)) {\\r\\n                    addresses[winnersCount] = level[i][j];\\r\\n                    winnersCount++;\\r\\n                    if (winnersCount == goldenWinners) {\\r\\n                        return;\\r\\n                    }\\r\\n                }\\r\\n            }\\r\\n        }\\r\\n\\r\\n    }\\r\\n\\r\\n}\\r\\n\\r\\ncontract RefStorage is Ownable {\\r\\n\\r\\n    IERC20 public token;\\r\\n\\r\\n    mapping (address => bool) public contracts;\\r\\n\\r\\n    uint256 public prize = 0.00005 ether;\\r\\n    uint256 public interval = 100;\\r\\n\\r\\n    mapping (address => Player) public players;\\r\\n    struct Player {\\r\\n        uint256 tickets;\\r\\n        uint256 checkpoint;\\r\\n        address referrer;\\r\\n    }\\r\\n\\r\\n    event ReferrerAdded(address player, address referrer);\\r\\n    event BonusSent(address recipient, uint256 amount);\\r\\n\\r\\n    modifier restricted() {\\r\\n        require(contracts[msg.sender]);\\r\\n        _;\\r\\n    }\\r\\n\\r\\n    constructor() public {\\r\\n        token = IERC20(address(0x9f9EFDd09e915C1950C5CA7252fa5c4F65AB049B));\\r\\n    }\\r\\n\\r\\n    function changeContracts(address contractAddr) public onlyOwner {\\r\\n        contracts[contractAddr] = true;\\r\\n    }\\r\\n\\r\\n    function changePrize(uint256 newPrize) public onlyOwner {\\r\\n        prize = newPrize;\\r\\n    }\\r\\n\\r\\n    function changeInterval(uint256 newInterval) public onlyOwner {\\r\\n        interval = newInterval;\\r\\n    }\\r\\n\\r\\n    function newTicket() external restricted {\\r\\n        players[tx.origin].tickets++;\\r\\n        if (players[tx.origin].referrer != address(0) && (players[tx.origin].tickets - players[tx.origin].checkpoint) % interval == 0) {\\r\\n            if (token.balanceOf(address(this)) >= prize * 2) {\\r\\n                token.transfer(tx.origin, prize);\\r\\n                emit BonusSent(tx.origin, prize);\\r\\n                token.transfer(players[tx.origin].referrer, prize);\\r\\n                emit BonusSent(players[tx.origin].referrer, prize);\\r\\n            }\\r\\n        }\\r\\n    }\\r\\n\\r\\n    function addReferrer(address referrer) external restricted {\\r\\n        if (players[tx.origin].referrer == address(0) && players[referrer].tickets >= interval && referrer != tx.origin) {\\r\\n            players[tx.origin].referrer = referrer;\\r\\n            players[tx.origin].checkpoint = players[tx.origin].tickets;\\r\\n\\r\\n            emit ReferrerAdded(tx.origin, referrer);\\r\\n        }\\r\\n    }\\r\\n\\r\\n    function sendBonus(address winner) external restricted {\\r\\n        if (token.balanceOf(address(this)) >= prize) {\\r\\n            token.transfer(winner, prize);\\r\\n\\r\\n            emit BonusSent(winner, prize);\\r\\n        }\\r\\n    }\\r\\n\\r\\n    function withdrawERC20(address ERC20Token, address recipient) external onlyOwner {\\r\\n        uint256 amount = IERC20(ERC20Token).balanceOf(address(this));\\r\\n        IERC20(ERC20Token).transfer(recipient, amount);\\r\\n    }\\r\\n\\r\\n    function ticketsOf(address player) public view returns(uint256) {\\r\\n        return players[player].tickets;\\r\\n    }\\r\\n\\r\\n    function referrerOf(address player) public view returns(address) {\\r\\n        return players[player].referrer;\\r\\n    }\\r\\n}\\r\\n\\r\\ncontract Lottery100ETH is Ownable {\\r\\n\\r\\n    Storage public x;\\r\\n    RefStorage public RS;\\r\\n    LotteryTicket public LT;\\r\\n    WinnerTicket public WT;\\r\\n\\r\\n    uint256 constant public PRICE = 0.01 ether;\\r\\n\\r\\n    address[] public players;\\r\\n\\r\\n    uint256 public limit = 10000;\\r\\n\\r\\n    uint256 public futureblock;\\r\\n\\r\\n    uint256 public gameCount;\\r\\n\\r\\n    bool public paused;\\r\\n\\r\\n    uint256[] silver    = [40,  0.5 ether];\\r\\n    uint256[] gold      = [10,  1   ether];\\r\\n    uint256[] brilliant = [1,   50  ether];\\r\\n\\r\\n    event NewPlayer(address indexed addr, uint256 indexed gameCount);\\r\\n    event SilverWinner(address indexed addr, uint256 prize, uint256 indexed gameCount);\\r\\n    event GoldenWinner(address indexed addr, uint256 prize, uint256 indexed gameCount);\\r\\n    event BrilliantWinner(address indexed addr, uint256 prize, uint256 indexed gameCount);\\r\\n    event txCostRefunded(address indexed addr, uint256 amount);\\r\\n    event FeePayed(address indexed owner, uint256 amount);\\r\\n\\r\\n    modifier notFromContract() {\\r\\n        address addr = msg.sender;\\r\\n        uint256 size;\\r\\n        assembly { size := extcodesize(addr) }\\r\\n        require(size <= 0);\\r\\n        _;\\r\\n    }\\r\\n\\r\\n    constructor(address RS_Addr) public {\\r\\n        x = new Storage();\\r\\n        LT = new LotteryTicket();\\r\\n        WT = new WinnerTicket();\\r\\n        RS = RefStorage(RS_Addr);\\r\\n        gameCount++;\\r\\n    }\\r\\n\\r\\n    function() public payable notFromContract {\\r\\n\\r\\n        if (players.length == 0 && paused) {\\r\\n            revert();\\r\\n        }\\r\\n\\r\\n        if (players.length == limit) {\\r\\n            drawing();\\r\\n\\r\\n            if (players.length == 0 && paused || msg.value < PRICE) {\\r\\n                msg.sender.transfer(msg.value);\\r\\n                return;\\r\\n            }\\r\\n\\r\\n        }\\r\\n\\r\\n        require(msg.value >= PRICE);\\r\\n\\r\\n        if (msg.value > PRICE) {\\r\\n            msg.sender.transfer(msg.value - PRICE);\\r\\n        }\\r\\n\\r\\n        if (msg.data.length != 0) {\\r\\n            RS.addReferrer(bytesToAddress(bytes(msg.data)));\\r\\n        }\\r\\n\\r\\n        players.push(msg.sender);\\r\\n        x.purchase(msg.sender);\\r\\n        RS.newTicket();\\r\\n        LT.emitEvent(msg.sender);\\r\\n        emit NewPlayer(msg.sender, gameCount);\\r\\n\\r\\n        if (players.length == limit) {\\r\\n            drawing();\\r\\n        }\\r\\n\\r\\n    }\\r\\n\\r\\n    function drawing() internal {\\r\\n\\r\\n        require(block.number > futureblock, \\\"Awaiting for a future block\\\");\\r\\n\\r\\n        if (block.number >= futureblock + 210) {\\r\\n            futureblock = block.number + 40;\\r\\n            return;\\r\\n        }\\r\\n\\r\\n        uint256 gas = gasleft();\\r\\n\\r\\n        for (uint256 i = 0; i < silver[0]; i++) {\\r\\n            address winner = players[uint((blockhash(futureblock - 1 - i))) % players.length];\\r\\n            winner.send(silver[1]);\\r\\n            WT.emitEvent(winner);\\r\\n            emit SilverWinner(winner, silver[1], gameCount);\\r\\n        }\\r\\n\\r\\n        uint256 goldenWinners = gold[0];\\r\\n        uint256 goldenPrize = gold[1];\\r\\n        if (x.count() < gold[0]) {\\r\\n            goldenWinners = x.count();\\r\\n            goldenPrize = gold[0] * gold[1] \\/ x.count();\\r\\n        }\\r\\n        if (goldenWinners != 0) {\\r\\n            address[] memory addresses = x.draw(goldenWinners);\\r\\n            for (uint256 k = 0; k < addresses.length; k++) {\\r\\n                addresses[k].send(goldenPrize);\\r\\n                RS.sendBonus(addresses[k]);\\r\\n                WT.emitEvent(addresses[k]);\\r\\n                emit GoldenWinner(addresses[k], goldenPrize, gameCount);\\r\\n            }\\r\\n        }\\r\\n\\r\\n        uint256 laps = 14;\\r\\n        uint256 winnerIdx;\\r\\n        uint256 indexes = players.length * 1e18;\\r\\n        for (uint256 j = 0; j < laps; j++) {\\r\\n            uint256 change = (indexes) \\/ (2 ** (j+1));\\r\\n            if (uint(blockhash(futureblock - j)) % 2 == 0) {\\r\\n                winnerIdx += change;\\r\\n            }\\r\\n        }\\r\\n        winnerIdx = winnerIdx \\/ 1e18;\\r\\n        players[winnerIdx].send(brilliant[1]);\\r\\n        WT.emitEvent(players[winnerIdx]);\\r\\n        emit BrilliantWinner(players[winnerIdx], brilliant[1], gameCount);\\r\\n\\r\\n        players.length = 0;\\r\\n        futureblock = 0;\\r\\n        x = new Storage();\\r\\n        gameCount++;\\r\\n\\r\\n        uint256 txCost = tx.gasprice * (gas - gasleft());\\r\\n        msg.sender.send(txCost);\\r\\n        emit txCostRefunded(msg.sender, txCost);\\r\\n\\r\\n        uint256 fee = address(this).balance - msg.value;\\r\\n        owner.send(fee);\\r\\n        emit FeePayed(owner, fee);\\r\\n\\r\\n    }\\r\\n\\r\\n    function pause() public onlyOwner {\\r\\n        paused = true;\\r\\n    }\\r\\n\\r\\n    function unpause() public onlyOwner {\\r\\n        paused = false;\\r\\n    }\\r\\n\\r\\n    function withdrawERC20(address ERC20Token, address recipient) external onlyOwner {\\r\\n        uint256 amount = IERC20(ERC20Token).balanceOf(address(this));\\r\\n        IERC20(ERC20Token).transfer(recipient, amount);\\r\\n    }\\r\\n\\r\\n    function bytesToAddress(bytes source) internal pure returns(address parsedReferrer) {\\r\\n        assembly {\\r\\n            parsedReferrer := mload(add(source,0x14))\\r\\n        }\\r\\n        return parsedReferrer;\\r\\n    }\\r\\n\\r\\n    function amountOfPlayers() public view returns(uint) {\\r\\n        return players.length;\\r\\n    }\\r\\n\\r\\n    function referrerOf(address player) external view returns(address) {\\r\\n        return RS.referrerOf(player);\\r\\n    }\\r\\n\\r\\n    function ticketsOf(address player) external view returns(uint256) {\\r\\n        return RS.ticketsOf(player);\\r\\n    }\",\r\n\"version\":\"0.4.25\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/detect_vulnerability",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"detect_vulnerability"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "detect_fraud",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"transaction_hash\":\"0xac5b774d41b63b03d1a9efa419d0c2423e1de231f87768f525f782cf6a8da8ca\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/detect_fraud",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"detect_fraud"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "detect_vulnerability",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"transaction_hash\":\"0xac5b774d41b63b03d1a9efa419d0c2423e1de231f87768f525f782cf6a8da8ca\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/detect_fraud",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"detect_fraud"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ETH get trans details",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://api.etherscan.io/api?module=proxy&action=eth_getTransactionByHash&txhash=0xac5b774d41b63b03d1a9efa419d0c2423e1de231f87768f525f782cf6a8da8ca&apikey={{apiKey}}",
+					"protocol": "https",
+					"host": [
+						"api",
+						"etherscan",
+						"io"
+					],
+					"path": [
+						"api"
+					],
+					"query": [
+						{
+							"key": "module",
+							"value": "proxy"
+						},
+						{
+							"key": "action",
+							"value": "eth_getTransactionByHash"
+						},
+						{
+							"key": "txhash",
+							"value": "0xac5b774d41b63b03d1a9efa419d0c2423e1de231f87768f525f782cf6a8da8ca"
+						},
+						{
+							"key": "apikey",
+							"value": "{{apiKey}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ETH get sender info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://api.etherscan.io/api?module=account&action=txlist&address=0xcfea76432f74c078c266c75256699078a85a79ce&startblock=0&endblock=99999999&page=1&offset=10&sort=asc&apikey={{apiKey}}",
+					"protocol": "https",
+					"host": [
+						"api",
+						"etherscan",
+						"io"
+					],
+					"path": [
+						"api"
+					],
+					"query": [
+						{
+							"key": "module",
+							"value": "account"
+						},
+						{
+							"key": "action",
+							"value": "txlist"
+						},
+						{
+							"key": "address",
+							"value": "0xcfea76432f74c078c266c75256699078a85a79ce"
+						},
+						{
+							"key": "startblock",
+							"value": "0"
+						},
+						{
+							"key": "endblock",
+							"value": "99999999"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "offset",
+							"value": "10"
+						},
+						{
+							"key": "sort",
+							"value": "asc"
+						},
+						{
+							"key": "apikey",
+							"value": "{{apiKey}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "Test QuickNote upload doc",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.quicknode.com/ipfs/rest",
+					"protocol": "https",
+					"host": [
+						"api",
+						"quicknode",
+						"com"
+					],
+					"path": [
+						"ipfs",
+						"rest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "INFURA",
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "y8GSbE1DQ3uo5NTzGC9W6EfXxh5aUDsal57KakY/zXPubH0yskji0g",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "b82605f7e8164859b6c752b39374fd49",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "multipart/form-data",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"value": "test.json",
+							"type": "default"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://ipfs.infura.io:5001/api/v0/add?pin=false",
+					"protocol": "https",
+					"host": [
+						"ipfs",
+						"infura",
+						"io"
+					],
+					"port": "5001",
+					"path": [
+						"api",
+						"v0",
+						"add"
+					],
+					"query": [
+						{
+							"key": "pin",
+							"value": "false"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "curl --location 'https://api.quicknode.com/ipfs/rest/v1/s3/put-object' \\\r\n--header 'x-api-key: QN_474a97a3378c45d5961e2d647a8a7089' \\\r\n--form 'Body=@\"./rules.png\"' \\\r\n--form 'Key=\"YOUR_FILE_NAME\"' \\\r\n--form 'ContentType=\"YOUR_CONTENT_TYPE\"'"
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain get trans detail",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {
+					"accept": true
+				}
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"eth_getTransactionByHash\",\r\n    \"id\":1,\r\n    \"params\": [\r\n        \"0xc25b183e21ebd3ebff444c829c1b08d0ba8a8cda7662bf35c29b35eee97bd6ec\"\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.avax.network/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"avax",
+						"network"
+					],
+					"path": [
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain get balance (Zan top)",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {
+					"accept": true
+				}
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\":\"2.0\",\r\n    \"id\": 1,\r\n    \"method\" :\"eth_getBalance\",\r\n    \"params\" :[\"0x6C663A86191A8b8aC1654d0C29B162A0Df0A7C23\", \"latest\"]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.zan.top/node/v1/avax/fuji/be935d95620b40f5816620abbcf4bc2a/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"zan",
+						"top"
+					],
+					"path": [
+						"node",
+						"v1",
+						"avax",
+						"fuji",
+						"be935d95620b40f5816620abbcf4bc2a",
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain estimate gas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"eth_getTransactionByHash\",\r\n    \"params\": [\r\n        \"0x312cd08cc6d5db51184582a35c855bc457c6688fd75a63d70b39ad5f26909296\"\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.avax.network/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"avax",
+						"network"
+					],
+					"path": [
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain get balance",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"id\":1,\r\n    \"method\": \"eth_getBalance\",\r\n    \"params\": [\r\n        \"0x72e278E2220CecA0Ff95185Aa5E095A4E32e8E05\",\r\n        \"latest\"\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.avax.network/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"avax",
+						"network"
+					],
+					"path": [
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain get transaction count",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"id\":1,\r\n    \"method\": \"eth_getTransactionCount\",\r\n    \"params\": [\r\n        \"0x72e278E2220CecA0Ff95185Aa5E095A4E32e8E05\"\r\n        , \"latest\"\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.avax.network/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"avax",
+						"network"
+					],
+					"path": [
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain estimate gas",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"id\":63,\r\n    \"method\": \"eth_estimateGas\",\r\n    \"params\": [\r\n{\"type\":\"0x2\",\"maxFeePerGas\":\"0xbfda3a300\",\"maxPriorityFeePerGas\":\"0x59682f00\",\"from\":\"0x6c663a86191a8b8ac1654d0c29b162a0df0a7c23\",\"to\":\"0x27e87CCdbAcc1354Bf8585C7088A1CbC386aDAF2\",\"data\":\"0xc476508a00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000493e00000000000000000000000000000000000000000000000000000000000000000\"}\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.avax-test.network/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"avax-test",
+						"network"
+					],
+					"path": [
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "C-chain estimate gas (Zan top) Copy",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {
+					"accept": true
+				}
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"id\":63,\r\n    \"method\": \"eth_estimateGas\",\r\n    \"params\": [\r\n{\"type\":\"0x2\",\"maxFeePerGas\":\"0xbfda3a300\",\"maxPriorityFeePerGas\":\"0x59682f00\",\"from\":\"0x6c663a86191a8b8ac1654d0c29b162a0df0a7c23\",\"to\":\"0x15e8e17f1080f0fb9d65d6bd83ff5817c6476ab2\",\"data\":\"0x52a81eeb0000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000052000000000000000000000000000000000000000000000000000000000000007200000000000000000000000000000000000000000000000000000000000001e8800000000000000000000000000000000000000000000000000000000000493e066756e2d6176616c616e6368652d66756a692d3100000000000000000000000000000000000000000000000000000000000000000000000000000000000003ac636f6e7374206261736555726c203d20617267735b305d0d0a636f6e73742074786e735f68617368203d20617267735b315d0d0a0d0a2f2f204d616b6520746865204854545020726571756573740d0a636f6e73742061766178547844657461696c526573706f6e7365203d2061776169742046756e6374696f6e732e6d616b654874747052657175657374287b0d0a2020202075726c3a206261736555726c2c0d0a202020206d6574686f643a2022504f5354222c0d0a20202020686561646572733a7b0d0a202020202020202022436f6e74656e742d54797065223a226170706c69636174696f6e2f6a736f6e220d0a202020207d2c0d0a20202020646174613a7b0d0a2020202020202020226a736f6e727063223a2022322e30222c0d0a2020202020202020226d6574686f64223a20226574685f6765745472616e73616374696f6e427948617368222c0d0a202020202020202022706172616d73223a205b0d0a20202020202020202020202074786e735f686173680d0a20202020202020205d0d0a202020207d0d0a7d293b0d0a20200d0a6966202861766178547844657461696c526573706f6e73652e6572726f7229207b0d0a202020207468726f77204572726f72286052657175657374206661696c65642c2073746174757320636f64653a20247b61766178547844657461696c526573706f6e73652e726573706f6e73652e7374617475737d60293b0d0a7d0d0a0d0a2f2f20666574636820726573706f6e73650d0a636f6e737420726573706f6e7365203d2061766178547844657461696c526573706f6e73652e646174613b0d0a6c65742066696c74657265644461746120203d207b7d3b0d0a6966202820726573706f6e73652020213d20756e646566696e656420262620726573706f6e736520213d206e756c6c20297b0d0a20202020636f6e73742074785f64657461696c73203d20726573706f6e73655b27726573756c74275d3b0d0a0d0a202020202f2f66696c746572696e670d0a20202020636f6e7374207265717569726564436f6c756d6e73203d20617267732e736c6963652831290d0a2020202066696c746572656444617461203d204f626a6563742e66726f6d456e7472696573287265717569726564436f6c756d6e732e6d6170286b6579203d3e205b6b65792c2074785f64657461696c735b6b65795d5d29293b0d0a7d0d0a0d0a72657475726e2046756e6374696f6e732e656e636f6465537472696e67284a534f4e2e737472696e676966792866696c7465726564446174612929000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000002568747470733a2f2f6170692e617661782e6e6574776f726b2f6578742f62632f432f7270630000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000042307833313263643038636336643564623531313834353832613335633835356263343537633636383866643735613633643730623339616435663236393039323936000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000466726f6d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002746f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"}\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api.zan.top/node/v1/avax/fuji/be935d95620b40f5816620abbcf4bc2a/ext/bc/C/rpc",
+					"protocol": "https",
+					"host": [
+						"api",
+						"zan",
+						"top"
+					],
+					"path": [
+						"node",
+						"v1",
+						"avax",
+						"fuji",
+						"be935d95620b40f5816620abbcf4bc2a",
+						"ext",
+						"bc",
+						"C",
+						"rpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Polygon Sample API call",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "User-Agent",
+						"value": "request",
+						"type": "default",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=BTC&to_currency=CNY&apikey=OY5I3LUMJM16PREY",
+					"protocol": "https",
+					"host": [
+						"www",
+						"alphavantage",
+						"co"
+					],
+					"path": [
+						"query"
+					],
+					"query": [
+						{
+							"key": "function",
+							"value": "CURRENCY_EXCHANGE_RATE"
+						},
+						{
+							"key": "from_currency",
+							"value": "BTC"
+						},
+						{
+							"key": "to_currency",
+							"value": "CNY"
+						},
+						{
+							"key": "apikey",
+							"value": "OY5I3LUMJM16PREY"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Our APP-polygon sample call",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/polygon/testPolygon",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"polygon",
+						"testPolygon"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Our APP-polygon sample call Write action",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/polygon/testWriteAction",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"polygon",
+						"testWriteAction"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Our App-Avax trans analysis",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"hash\":\"0xc25b183e21ebd3ebff444c829c1b08d0ba8a8cda7662bf35c29b35eee97bd6ec\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/avax/detect_fraud",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"avax",
+						"detect_fraud"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Our APP-polygon trans fraud",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"hash\": \"0xde40d1751406296f5b183ff6b0dea5d8d11bdbdef0d70dca990250e49acf5514\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/polygon/detect_fraud",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"polygon",
+						"detect_fraud"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
