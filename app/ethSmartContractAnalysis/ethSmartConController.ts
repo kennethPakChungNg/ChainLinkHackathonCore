@@ -80,7 +80,7 @@ const analyze_smart_contract = async( contractCode:string, solidityVersion:strin
 
     console.log('Return structured data:', structured_data);
 
-    return structured_data;
+    return {"result":structured_data};
 
 }
 
