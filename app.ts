@@ -1,6 +1,7 @@
 import express from 'express';
 import createError from 'http-errors';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import ethTxnsAnalysisRouter from './app/ethTxnsAnalysis/txnsAnalysisRouter';
 import ethSmartConRouter from './app/ethSmartContractAnalysis/ethSmartConRouter';
 import avax_analysisRouter from './app/avaxAnalysis/avax_analysisRouter'
@@ -17,6 +18,8 @@ export default class Startup {
     // Registers all middleware
     public async setup(){
         require('dotenv').config()
+
+        this.app.use(cors());
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: false }));
         this.app.use(cookieParser());

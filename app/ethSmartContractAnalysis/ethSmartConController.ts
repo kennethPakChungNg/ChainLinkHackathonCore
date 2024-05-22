@@ -56,6 +56,7 @@ const analyze_smart_contract = async( contractCode:string, solidityVersion:strin
     for (let section of sections) {
       section = '- **Vulnerability Security Level**:' + section;
       const vulnerability_data = {};
+      console.log('vulnerability data section: ', section);
     
       const patterns = {
         Level: /- \*\*Vulnerability Security Level\*\*:\s*(.*?)\n/,
@@ -63,7 +64,7 @@ const analyze_smart_contract = async( contractCode:string, solidityVersion:strin
         Type: /\*\*Vulnerability Type\*\*:\s*(.*?)\n/,
         Consequences: /\*\*Consequences\*\*:\s*(.*?)\n/,
         Recommendation: /\*\*Recommendation\*\*:\s*(.*?)\n/,
-        Explanation: /\*\*Explanation\*\*:\s*(.*?)(?=\n-\s*\*\*|$)/,
+        Explanation: /\*\*Explanation\*\*:\s*([\s\S]*?)(?=\n-\s*\*\*|$)/,
       };
     
       for (let [key, regex] of Object.entries(patterns)) {
@@ -77,7 +78,10 @@ const analyze_smart_contract = async( contractCode:string, solidityVersion:strin
       
     }
 
+    console.log('Return structured data:', structured_data);
+
     return structured_data;
+
 }
 
 const uploadContractResult = async( promptResult:any )=>{
