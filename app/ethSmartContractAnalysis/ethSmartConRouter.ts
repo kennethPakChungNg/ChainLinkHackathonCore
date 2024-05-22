@@ -3,18 +3,12 @@ const router = express.Router();
 
 import {analyze_smart_contract, uploadContractResult, getSmartContractSourceCodeByAddress } from "./ethSmartConController"
 
-
 router.post( '/getSmartContractSourceCodeByAddress', async(req: express.Request, res: express.Response)=>{   
     try
     {
         const requestBody = req.body ;
         const contractAddr: string = requestBody.contractAddr
         const resultJson = await getSmartContractSourceCodeByAddress(contractAddr);
-  
-        console.log("###############################")
-        console.log(resultJson)
-        console.log("###############################")
-
         res.json(resultJson);
     }
     catch(err)
@@ -25,8 +19,6 @@ router.post( '/getSmartContractSourceCodeByAddress', async(req: express.Request,
     }
 });
 
-
-// POST users listing. 
 router.post( '/detect_vulnerability' ,  async(req: express.Request,res: express.Response)=>{   
     try
     {
@@ -51,4 +43,3 @@ router.post( '/detect_vulnerability' ,  async(req: express.Request,res: express.
 });
 
 export default router;
-
