@@ -62,7 +62,7 @@ const ipfsUploadFile = async (fileName, fileContent, contentType ) =>{
         //return await ipfsUploadFileWithClient(client,fileName, fileData )
     }catch(err){
         logger.error(err)
-        throw err;
+        return {ipfsLink:""}
     }
 }
 
