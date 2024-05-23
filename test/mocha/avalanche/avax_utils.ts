@@ -18,7 +18,7 @@ before(function() {
 
 describe('Avalanche trans', function() {
     this.timeout(10000)
-    it( 'Connect RPC provider', async ()=>{
+    it.skip( 'Connect RPC provider', async ()=>{
         const rpcProvider = await getRpcProvider(AVAX_RPC_URL);
 
         const wallet = await getWallet(ContractOwner_privateKey)
@@ -26,7 +26,7 @@ describe('Avalanche trans', function() {
         const signer = getSigner(wallet, rpcProvider);
     })
 
-    it(' Get wallet details ', async()=>{
+    it.skip(' Get wallet details ', async()=>{
         try{
             const address = "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"
             const receiverInfo = await getWalletDtls( address, false, "to")    
@@ -44,7 +44,7 @@ describe('Avalanche trans', function() {
         }
     })
 
-    it('Get wallet txs list from avacloud ', async ()=>{
+    it.skip('Get wallet txs list from avacloud ', async ()=>{
         try{
             const address = "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"
         

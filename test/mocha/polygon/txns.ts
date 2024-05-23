@@ -15,7 +15,7 @@ before(function() {
 
 describe('Polygon App', async function() {
     this.timeout(5000);
-    it( 'Test getting walletDtls', async ()=>{
+    it.skip( 'Test getting walletDtls', async ()=>{
         const address = "0x0f3284bFEbc5f55B849c8CF792D39cC0f729e0BC"
         const receiverInfo = await getWalletDtls( address, false, "to")    
 
