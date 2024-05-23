@@ -3,6 +3,9 @@ import {JsonRpcProvider} from "@ethersproject/providers"
 import {formatEther} from "@ethersproject/units";
 import { BigNumberish } from "@ethersproject/bignumber";
 import logger from "./logger"
+import { decodeResult } from "@chainlink/functions-toolkit";
+//import { ethers } from "ethers";
+//import { utils, BigNumber } from "ethers";
 
 class ContractIssuer {
     private privateKey: string = process.env.ContractOwner_privateKey;
@@ -44,10 +47,11 @@ class ContractIssuer {
     }
 }
 
-
+//overflow problem occur in here
 const gWei2ETH = (gWei: BigNumberish )=>{
     // = Number(gWei) / 10**18
-    return  formatEther(gWei)  
+
+    return  formatEther(gWei)
 }
 
 const getWalletAnalysis = ( addressDetail: any ) =>{

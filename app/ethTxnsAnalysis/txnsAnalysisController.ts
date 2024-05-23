@@ -12,10 +12,12 @@ import {txRequestPortion} from "../ethTxnsAnalysis/apiCall/txDetails/txDetails_c
 import axios,{AxiosResponse } from 'axios';
 
 import {query as bitQuery} from "../ethTxnsAnalysis/apiCall/bitQuery/bitQuery"
-import { ReturnType } from "@chainlink/functions-toolkit"
+import { ReturnType, decodeResult } from "@chainlink/functions-toolkit"
 import {getPrompt_transFraud, rptPattern_transFraud} from "../ethTxnsAnalysis/apiCall/openAi/openAi_transFraud"
 import {requestDirectQuestion as analysisByOpenAI} from "../../common/openAiUtils"
 import { getTxnByHash } from "../../common/etherScanUtil"
+import { BigNumber } from "@ethersproject/bignumber";
+
 
 const explorerUrl = "https://sepolia.etherscan.io"
 
@@ -157,14 +159,17 @@ const getWalletAnalysis_ETH = ( addressDetail: any ) =>{
         time_diff_mins = (last_tx_time-first_tx_time)/60
     }
 
+    //overflow problem location
     if (addressDetail.length >  0 ){
         min_value_received =  addressDetail.reduce((min, current) => {
             const currentValue = parseFloat(current.value);
             return currentValue < min ? currentValue : min;
         }, Infinity);
         
+        console.log("xxxxxxxxxxxxxxxxx");
         //from Wei to ETH
-        min_value_received = gWei2ETH(min_value_received)
+        min_value_received = gWei2ETH(min_value_received) //overflow problem location
+        console.log("yyyyyyyyyyyyyyyyyyy");
     }
 
     return {
@@ -301,8 +306,16 @@ const getWalletBalance_ETH = async( walletAddr: string, useChainlink: boolean ) 
     const response = await axios.get(url);
     let balance = null;
     if ( response.status == 200 ){
-        balance = gWei2ETH(response.data['result'])  
+        //const balanceWei = BigInt(response.data['result']);
+        //balance = (balanceWei / WeiPerEther).toString(); // Convert Wei to Ether
+
+
+        const decodedBalance = BigNumber.from(response.data['result']);
+
+        balance = gWei2ETH( decodedBalance )  
+
     }
+    console.log('Balance:', balance);
 
     logger.info(`Received balance of address ${walletAddr}`)
     return {balance:balance};
@@ -314,12 +327,14 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
 
     const response = await axios.get(url);
     if ( response.status == 200 ){
-        const addressDetail = response.data['result']
+        const addressDetail = response.data['result'];
+        console.log(`Address details for ${role} (${walletAddr}):`, addressDetail);
 
         const lastPageTrans = addressDetail.slice(-10 );
 
-        const walletAnaData = getWalletAnalysis_ETH( addressDetail )
-        const walletBalance = await getWalletBalance_ETH( walletAddr, useChainlink )
+        const walletAnaData = getWalletAnalysis_ETH( addressDetail ); // bignumber overflow problem in here
+
+        const walletBalance = await getWalletBalance_ETH( walletAddr, useChainlink );
 
         const values = { 
             ...{
@@ -381,6 +396,7 @@ const analyze_fraud = async(transaction_hash: string) => {
     try {
         //Return format:   tx_details 
         const txDetails = await getTxDetails_ETH(transaction_hash);
+        console.log("get transaction detail result is: ", txDetails);
         //const txDetails = await getTxDetails_CL(transaction_hash);
         const bitQueryDtl =  await getBitQueryData( transaction_hash )
         
@@ -389,8 +405,8 @@ const analyze_fraud = async(transaction_hash: string) => {
 
         const useChainlinkService = false;
         //latest page trans, balance,last page transTime diff, min value received, format: {time_diff_mins:time_diff_mins, min_value_received:min_value_received}
-        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")    
-        const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
+        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender") 
+        const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )
 
         // openai analysis
         const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);

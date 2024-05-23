@@ -15,6 +15,7 @@
     "@chainlink/functions-toolkit": "^0.2.8",
     "@web3-storage/w3up-client": "^13.1.0",
     "axios": "^1.6.8",
+    "bignumber.js": "^9.1.2",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -28,6 +29,7 @@
     "node-fetch": "^3.3.2",
     "npm": "^10.7.0",
     "request-promise": "^4.2.6",
+    "string-hex": "^1.0.0",
     "winston": "^3.13.0"
   },
   "devDependencies": {
