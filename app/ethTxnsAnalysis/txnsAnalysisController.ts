@@ -119,8 +119,15 @@ const getBitQueryData = async( tx_hash: string ) =>{
         }
     }
 
-    const response:AxiosResponse  = await axios.post(process.env.BITQUERY_API_URL,requestBody, {headers} );
+    let response :AxiosResponse = null;
     let bitQueryDtl = {}
+    try{
+        response = await axios.post(process.env.BITQUERY_API_URL,requestBody, {headers} );
+    }catch( error ){
+        //return default
+        return bitQueryDtl
+    }
+    
     if ( response.status == 200 ){
         if ( response.data['errors'] != undefined ){
             logger.error( JSON.stringify(response.data['errors']) )

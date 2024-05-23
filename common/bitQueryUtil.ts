@@ -7,6 +7,9 @@ import axios,{AxiosResponse } from 'axios';
 const getContractType = ( bitQueryDtl:any, role: string ) =>{
     logger.info("Role info :")
     logger.info( bitQueryDtl[role])
+    if (  bitQueryDtl[role] == undefined ){
+        return undefined;
+    }
     const smartContract = bitQueryDtl[role]['smartContract']
 
     const contractType = smartContract['contractType'] ;
@@ -27,8 +30,15 @@ const getBitQueryData = async( bitQuery:string, tx_hash: string ) =>{
         }
     }
 
-    const response:AxiosResponse  = await axios.post( BITQUERY_API_URL,requestBody, {headers} );
+    let response :AxiosResponse = null;
     let bitQueryDtl = {}
+    try{
+        response = await axios.post( BITQUERY_API_URL,requestBody, {headers} );
+    }catch( error ){
+        //return default
+        return bitQueryDtl
+    }
+
     if ( response.status == 200 ){
         if ( response.data['errors'] != undefined ){
             logger.error( JSON.stringify(response.data['errors']) )
