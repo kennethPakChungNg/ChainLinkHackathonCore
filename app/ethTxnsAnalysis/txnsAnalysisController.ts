@@ -127,11 +127,11 @@ const getBitQueryData = async( tx_hash: string ) =>{
         //return default
         return bitQueryDtl
     }
-    
+
     if ( response.status == 200 ){
         if ( response.data['errors'] != undefined ){
-            logger.error( JSON.stringify(response.data['errors']) )
-            throw new Error( `Bitquery error.` )
+            logger.error( `Bitquery error: ${JSON.stringify(response.data['errors'])}`);
+            return bitQueryDtl;
         }
 
         //normal way

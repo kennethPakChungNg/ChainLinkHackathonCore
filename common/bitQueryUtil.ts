@@ -36,23 +36,23 @@ const getBitQueryData = async( bitQuery:string, tx_hash: string ) =>{
         response = await axios.post( BITQUERY_API_URL,requestBody, {headers} );
     }catch( error ){
         //return default
-        return bitQueryDtl
+        return bitQueryDtl;
     }
 
     if ( response.status == 200 ){
         if ( response.data['errors'] != undefined ){
-            logger.error( JSON.stringify(response.data['errors']) )
-            throw new Error( `Bitquery error.` )
+            logger.error( `Bitquery error: ${JSON.stringify(response.data['errors'])}`);
+            return bitQueryDtl;
         }
 
         //normal way
-        logger.info(" Successfully get trans details from bitquery. ")
-        const data = response.data['data']['ethereum']['transactions']
-        bitQueryDtl =  Array.isArray(data)? data[0]: {}
+        logger.info(" Successfully get trans details from bitquery. ");
+        const data = response.data['data']['ethereum']['transactions'];
+        bitQueryDtl =  Array.isArray(data)? data[0]: {} ;
     }else{
-        logger.error(`No data found for transaction hash: ${tx_hash}. Response: ${response.data}`)
+        logger.error(`No data found for transaction hash: ${tx_hash}. Response: ${response.data}`) ;
     }
-    return  bitQueryDtl
+    return  bitQueryDtl;
 }
 
 export { getContractType, getBitQueryData }
