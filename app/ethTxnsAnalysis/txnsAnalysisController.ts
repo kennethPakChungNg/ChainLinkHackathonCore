@@ -173,10 +173,10 @@ const getWalletAnalysis_ETH = ( addressDetail: any ) =>{
             return currentValue < min ? currentValue : min;
         }, Infinity);
         
-        console.log("xxxxxxxxxxxxxxxxx");
+        
         //from Wei to ETH
         min_value_received = gWei2ETH(min_value_received) //overflow problem location
-        console.log("yyyyyyyyyyyyyyyyyyy");
+        
     }
 
     return {
@@ -372,7 +372,7 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
     )
 
     const requestBody = {
-        'model': 'gpt-4-0125-preview',
+        'model': 'gpt-4o',
         'messages': [
             {"role": "system", "content": prompt_transFraud},
             {"role": "user", "content": "Analyze the transaction"}
@@ -389,6 +389,7 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
 
     let resultReport = {}
     const requiredContent = analysisResult['choices'][0]['message']['content']
+    console.log("requiredContent: ", requiredContent)
     for (const [key, pattern] of Object.entries(rptPattern_transFraud)) {
         const match = requiredContent.match(pattern);
         if (match) {

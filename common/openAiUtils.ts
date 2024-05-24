@@ -27,6 +27,9 @@ const requestDirectQuestion = async(prompt: string, requestBody: any)=>{
     const response:AxiosResponse  = await axios.post(url,data, {headers} );
     if ( response.status == 200 ){
         logger.info( "Successfully return result from OpenAI." )
+        console.log("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        console.log(response.data)
+        console.log("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
         return response.data;
     }else{
         logger.error( `Error when OpenAI call to ${url}: ${response.data }`)
@@ -36,15 +39,16 @@ const requestDirectQuestion = async(prompt: string, requestBody: any)=>{
 }
 
 const rptPattern_transFraud = {
-    Likelihood_of_Fraud_Or_Scam_In_Percentage: /\*Likelihood of Fraud Or Scam In Percentage\*\:\s(\d+)%/,
-    Type_of_The_Possible_Fraud: /\*Type of The Possible Fraud\*\:\s([^\n]+)/,
-    Ownership_of_From_Address: /\*Ownership of From Address\*\:\s([^\n]+)/,
-    Ownership_of_To_Address: /\*Ownership of To Address\*\:\s([^\n]+)/,
-    Behavior_of_the_From_and_To_Addresses: /\*Behavior of the From and To Addresses\*\:\s([\s\S]+?)(?=\*Peculiarities in the Transaction\*)/,
-    Peculiarities_in_the_Transaction: /\*Peculiarities in the Transaction\*\:\s([\s\S]+?)(?=\*Market Context and Alerts\*)/,
-    Market_Context_and_Alerts: /\*Market Context and Alerts\*\:\s([\s\S]+?)(?=\*Supporting Evidence for Assessment\*)/,
-    Supporting_Evidence_for_Assessment: /\*Supporting Evidence for Assessment\*\:\s([\s\S]+?)(?=\*Recommended Actions\*)/,
-    Recommended_Actions: /\*Recommended Actions\*\:\s([\s\S]+)/
+    
+    Likelihood_of_Fraud_Or_Scam_In_Percentage: /\*\*Likelihood of Fraud Or Scam In Percentage\*\*:\s*(\d+%)\s*/,
+    Type_of_The_Possible_Fraud: /\*\*Type of The Possible Fraud\*\*:\s*([^\n]+)/,
+    Ownership_of_From_Address: /\*\*Ownership of From Address\*\*:\s*([^\n]+)/,
+    Ownership_of_To_Address: /\*\*Ownership of To Address\*\*:\s*([^\n]+)/,
+    Behavior_of_the_From_and_To_Addresses: /\*\*Behavior of the From and To Addresses\*\*:\s*([\s\S]+?)(?=\*\*Peculiarities in the Transaction\*\*)/,
+    Peculiarities_in_the_Transaction: /\*\*Peculiarities in the Transaction\*\*:\s*([\s\S]+?)(?=\*\*Market Context and Alerts\*\*)/,
+    Market_Context_and_Alerts: /\*\*Market Context and Alerts\*\*:\s*([\s\S]+?)(?=\*\*Supporting Evidence for Assessment\*\*)/,
+    Supporting_Evidence_for_Assessment: /\*\*Supporting Evidence for Assessment\*\*:\s*([\s\S]+?)(?=\*\*Recommended Actions\*\*)/,
+    Recommended_Actions: /\*\*Recommended Actions\*\*:\s*([\s\S]+)/
   };
 
 const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQueryDtl:any, senderInfo: any, receiverInfo: any, currency: string , chainName: string ) => {

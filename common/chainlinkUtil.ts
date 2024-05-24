@@ -274,6 +274,7 @@ class CL_FunctionConsumer{
                 responseBytesHexstring, decodeMethod
             );
             logger.info(`\n✅ Decoded response to ${decodeMethod}, length : ${sizeOfString} bytes`);
+
             return decodedResponse;
         }
 

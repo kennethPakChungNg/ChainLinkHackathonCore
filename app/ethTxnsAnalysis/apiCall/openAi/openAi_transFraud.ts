@@ -1,6 +1,9 @@
 import {gWei2ETH} from "../../../../common/blockChainUtil"
 import {getContractType} from "../../../../common/bitQueryUtil"
-
+import {
+    ReturnType,
+    decodeResult
+}  from "@chainlink/functions-toolkit" ;
 
 
 const decideDataForPrompt=( data: any, outputIfNone:any  = 'N/A' )=>{
@@ -34,8 +37,8 @@ const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQuer
     Transaction Hash: ${transaction_hash}
     From address: ${senderAddr} (Previous transactions: ${senderInfo.lastPageTrans.length})
     To address: ${receiver} (Previous transactions: ${receiverInfo.lastPageTrans.length})
-    Transaction Value: ${  gWei2ETH(parseInt(txDetails['value'], 16 ) ) } ETH
-    Gas Used: ${ parseInt(txDetails['gas'], 16)}
+    Transaction Value: ${  gWei2ETH(decodeResult( txDetails['value'],ReturnType.int256  ) ) } ETH
+    Gas Used: ${ decodeResult(txDetails['gas'], ReturnType.int256 )}
 
     Time difference between the first and last transactions for the From address: ${senderTimeDiff} minutes
     Total Ether balance for the From address: ${senderBalance} ETH
@@ -88,15 +91,15 @@ const getPrompt_transFraud = ( transaction_hash:string, txDetails: any,  bitQuer
 }
 
 const rptPattern_transFraud = {
-    Likelihood_of_Fraud_Or_Scam_In_Percentage: /\*Likelihood of Fraud Or Scam In Percentage\*\:\s(\d+)%/,
-    Type_of_The_Possible_Fraud: /\*Type of The Possible Fraud\*\:\s([^\n]+)/,
-    Ownership_of_From_Address: /\*Ownership of From Address\*\:\s([^\n]+)/,
-    Ownership_of_To_Address: /\*Ownership of To Address\*\:\s([^\n]+)/,
-    Behavior_of_the_From_and_To_Addresses: /\*Behavior of the From and To Addresses\*\:\s([\s\S]+?)(?=\*Peculiarities in the Transaction\*)/,
-    Peculiarities_in_the_Transaction: /\*Peculiarities in the Transaction\*\:\s([\s\S]+?)(?=\*Market Context and Alerts\*)/,
-    Market_Context_and_Alerts: /\*Market Context and Alerts\*\:\s([\s\S]+?)(?=\*Supporting Evidence for Assessment\*)/,
-    Supporting_Evidence_for_Assessment: /\*Supporting Evidence for Assessment\*\:\s([\s\S]+?)(?=\*Recommended Actions\*)/,
-    Recommended_Actions: /\*Recommended Actions\*\:\s([\s\S]+)/
-  };
+    Likelihood_of_Fraud_Or_Scam_In_Percentage: /\*\*Likelihood of Fraud Or Scam In Percentage\*\*:\s*(\d+%)\s*/,
+    Type_of_The_Possible_Fraud: /\*\*Type of The Possible Fraud\*\*:\s*([^\n]+)/,
+    Ownership_of_From_Address: /\*\*Ownership of From Address\*\*:\s*([^\n]+)/,
+    Ownership_of_To_Address: /\*\*Ownership of To Address\*\*:\s*([^\n]+)/,
+    Behavior_of_the_From_and_To_Addresses: /\*\*Behavior of the From and To Addresses\*\*:\s*([\s\S]+?)(?=\*\*Peculiarities in the Transaction\*\*)/,
+    Peculiarities_in_the_Transaction: /\*\*Peculiarities in the Transaction\*\*:\s*([\s\S]+?)(?=\*\*Market Context and Alerts\*\*)/,
+    Market_Context_and_Alerts: /\*\*Market Context and Alerts\*\*:\s*([\s\S]+?)(?=\*\*Supporting Evidence for Assessment\*\*)/,
+    Supporting_Evidence_for_Assessment: /\*\*Supporting Evidence for Assessment\*\*:\s*([\s\S]+?)(?=\*\*Recommended Actions\*\*)/,
+    Recommended_Actions: /\*\*Recommended Actions\*\*:\s*([\s\S]+)/
+};
 
 export {getPrompt_transFraud, rptPattern_transFraud}

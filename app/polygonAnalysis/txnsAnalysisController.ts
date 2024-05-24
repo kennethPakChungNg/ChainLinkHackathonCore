@@ -13,14 +13,16 @@ import {
 } from "../../common/chainlinkUtil"
 import {query as bitQuerySql} from "./apiCall/bitQuery/bitQuery"
 import logger from "../../common/logger"
-import { ReturnType } from "@chainlink/functions-toolkit"
+import { ReturnType, decodeResult } from "@chainlink/functions-toolkit"
 import axios,{AxiosResponse } from 'axios';
 import {
     requestDirectQuestion as analysisByOpenAI,
     rptPattern_transFraud,
     getPrompt_transFraud
 } from "../../common/openAiUtils"
+import { BigNumber } from "@ethersproject/bignumber";
 const explorerUrl = 'https://amoy.polygonscan.com/tx'
+
 
 const sampleCall = async()=>{
     const {POLY_PROVIDER_URL, POLY_CONTRACT_ADDRESS} = process.env
@@ -87,7 +89,12 @@ const getWalletBalance = async( walletAddr: string, useChainlink: boolean ) =>{
     const response = await axios.get(url);
     let balance = null;
     if ( response.status == 200 ){
-        balance = gWei2ETH(response.data['result'])  
+
+        const decodedBalance = BigNumber.from(response.data['result']);
+
+        balance = gWei2ETH( decodedBalance )
+        console.log("getWalletBalance Balance: ", balance)  
+        
     }
 
     logger.info(`Received balance of address ${walletAddr}`)
@@ -106,6 +113,7 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
         const lastPageTrans = addressDetail.slice(-10 )
 
         const walletAnaData = getWalletAnalysis( addressDetail )
+
         const walletBalance = await getWalletBalance( walletAddr, useChainlink )
 
         const values = { 
@@ -117,7 +125,7 @@ const getWalletDtls = async( walletAddr:string, useChainlink: boolean, role: str
             } , 
             ...walletBalance   
         }
-
+        
         return values
     }
 
@@ -166,7 +174,9 @@ async function getTxDetails(txnHash: string){
     )
 
     const response = await consumer.retrieveReponse(transaction.hash, rpcProvider, cl_subManager.getRouterAddress(), ReturnType.string );
+    
     const jsonResponse = JSON.parse(response.toString())
+    
     return jsonResponse;
 }
 
@@ -184,7 +194,7 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
     )
 
     const requestBody = {
-        'model': 'gpt-4-0125-preview',
+        'model': 'gpt-4o',
         'messages': [
             {"role": "system", "content": prompt_transFraud},
             {"role": "user", "content": "Analyze the transaction"}
@@ -198,15 +208,15 @@ const openAi_analysisTransFraud = async(transaction_hash:string, txDetails:any,b
 
     //call openAI API
     const analysisResult = await analysisByOpenAI(  prompt_transFraud, requestBody )
-
     let resultReport = {}
     const requiredContent = analysisResult['choices'][0]['message']['content']
+
     for (const [key, pattern] of Object.entries(rptPattern_transFraud)) {
         const match = requiredContent.match(pattern);
         if (match) {
             resultReport[key] = match[1].trim();
         }
-      }
+    }
 
     return resultReport
 }
@@ -217,17 +227,19 @@ const analyze_fraud = async(transaction_hash)=>{
         const bitQueryDtl =  await getBitQueryData( bitQuerySql, transaction_hash )
 
 
-        const txDetails = await getTxDetails(transaction_hash);
-        
+        const txDetails = await getTxDetails(transaction_hash);     
         const senderAddr = txDetails['from'];
         const receiverAddr = txDetails['to'];
         
         const useChainlinkService = false;
-        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")    
-        const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )    
+
+        const senderInfo = await getWalletDtls( senderAddr, useChainlinkService, "sender")   
+
+        const receiverInfo = await getWalletDtls( receiverAddr, useChainlinkService, "to" )   //overflow problem
 
         //openai analysis
-        const analysisResult = await openAi_analysisTransFraud(transaction_hash,txDetails, bitQueryDtl, senderInfo, receiverInfo);
+        const analysisResult = await openAi_analysisTransFraud(transaction_hash, txDetails, bitQueryDtl, senderInfo, receiverInfo);
+
 
         return analysisResult;
 
