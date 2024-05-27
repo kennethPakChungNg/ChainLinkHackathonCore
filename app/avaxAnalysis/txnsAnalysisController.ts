@@ -228,10 +228,10 @@ const getWalletBalance_CL = async( walletAddr: string ) =>{
         let response = await consumerContract.retrieveReponse(transaction.hash, rpcProvider, cl_subManager.getRouterAddress(), ReturnType.uint256 );
                 
         //from wei to ETH
-        response = gWei2ETH(response)
+        const responseNum = gWei2ETH(Number(response))
     
         logger.info(`Received balance of address ${walletAddr}`)
-        return {balance: response } ; 
+        return {balance: responseNum } ; 
     }catch (error){
         logger.error( error.message )
         throw error;
