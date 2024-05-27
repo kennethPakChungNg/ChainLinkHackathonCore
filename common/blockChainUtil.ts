@@ -48,9 +48,9 @@ class ContractIssuer {
 
 //overflow problem occur in here
 const gWei2ETH = (gWei: BigNumberish )=>{
-    // = Number(gWei) / 10**18
+    return Number(gWei) / 10**18
     
-    return  formatEther(gWei)
+    //return  formatEther(gWei)
     
 }
 
